@@ -1,0 +1,30 @@
+<div class="tabla-wrapper">
+<table class="table align-middle">
+    <thead>
+        <tr><th>Producto</th><th class="text-end">Cantidad actual</th><th class="text-end">Precio compra</th><th>Agregar stock</th></tr>
+    </thead>
+    <tbody>
+        {% for producto in productos %}
+        <tr>
+            <td>{{ producto.nombre }}</td>
+            <td class="text-end">{{ producto.stock_actual }} {{ producto.unidad_medida }}</td>
+            <td class="text-end">${{ producto.precio_unitario }}</td>
+            <td>
+                <form method="post" action="{% url 'stock:compras' %}" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="producto_id" value="{{ producto.pk }}">
+                    <form method="post" action="{% url 'stock:compras' %}" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="producto_id" value="{{ producto.pk }}">
+                    <input type="hidden" name="tab" value="{{ tab_id }}">
+                    <input type="number" name="cantidad" min="1" class="form-control form-control-sm" style="width:100px" placeholder="Cant." required>
+                    <button type="submit" class="btn btn-sm btn-vino">+ Agregar</button>
+                </form>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No hay productos cargados en este sector todavía.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>

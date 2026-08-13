@@ -1,0 +1,10 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{% if object %}Editar paquete{% else %}Nuevo paquete{% endif %}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-vino">Guardar</button>
+    <a href="{% url 'stock:paquete_list' %}" class="btn-accion btn-volver">Cancelar</a>
+</form>
+{% endblock %}

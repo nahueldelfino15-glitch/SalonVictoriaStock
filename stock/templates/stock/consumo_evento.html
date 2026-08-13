@@ -1,0 +1,80 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<div class="mb-4">
+    <h1>Consumo - {{ evento.nombre }}</h1>
+    <p class="text-muted">{{ evento.fecha }} · {{ evento.get_estado_display }}</p>
+</div>
+
+<ul class="nav nav-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#barra-pane" type="button" role="tab">Barra</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cocina-pane" type="button" role="tab">Cocina</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#extras-pane" type="button" role="tab">Extras</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#personal-pane" type="button" role="tab">Personal</button>
+    </li>
+</ul>
+
+<div class="tab-content border border-top-0 p-3 mb-4">
+    <div class="tab-pane fade show active" id="barra-pane" role="tabpanel">
+        {% include 'stock/_tabla_consumo.html' with productos=productos_barra evento=evento tab_id='barra-pane' %}
+    </div>
+    <div class="tab-pane fade" id="cocina-pane" role="tabpanel">
+        {% include 'stock/_tabla_consumo.html' with productos=productos_cocina evento=evento tab_id='cocina-pane' %}
+    </div>
+    <div class="tab-pane fade" id="extras-pane" role="tabpanel">
+        {% include 'stock/_tabla_consumo.html' with productos=productos_extras evento=evento tab_id='extras-pane' %}
+    </div>
+    <div class="tab-pane fade" id="personal-pane" role="tabpanel">
+        <div class="tabla-wrapper">
+        <form method="post" action="{% url 'stock:personalevento_create' evento.pk %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'stock:consumo_evento' evento.pk %}#personal-pane">
+            <div class="col-md-3">
+                <label class="form-label">Empleado</label>
+                <select name="empleado" class="form-select" required>
+                    {% for empleado in empleados %}
+                    <option value="{{ empleado.pk }}">{{ empleado.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Puesto</label>
+                <input type="text" name="puesto" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Horas</label>
+                <input type="number" step="0.5" name="horas_trabajadas" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Pago</label>
+                <input type="number" step="0.01" name="pago" class="form-control">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-vino w-100">+ Agregar</button>
+            </div>
+        </form>
+        </div>
+    </div>
+</div>
+
+<a href="{% url 'stock:evento_detail' evento.pk %}" class="btn-accion btn-volver">Ver detalle completo del evento</a>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var hash = window.location.hash;
+    if (hash) {
+        var triggerEl = document.querySelector('button[data-bs-target="' + hash + '"]');
+        if (triggerEl) {
+            var tab = new bootstrap.Tab(triggerEl);
+            tab.show();
+        }
+    }
+});
+</script>
+{% endblock %}

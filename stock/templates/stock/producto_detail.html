@@ -1,0 +1,12 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{{ producto.nombre }}</h1>
+<ul class="list-group mb-3">
+    <li class="list-group-item"><strong>Sector:</strong> {{ producto.get_sector_display }}</li>
+    <li class="list-group-item"><strong>Precio unitario:</strong> ${{ producto.precio_unitario }}</li>
+    <li class="list-group-item"><strong>Stock actual:</strong> {{ producto.stock_actual }} {{ producto.unidad_medida }}</li>
+</ul>
+<a href="{% url 'stock:producto_update' producto.pk %}" class="btn-accion btn-editar">Editar</a>
+<a href="{% url 'stock:producto_delete' producto.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+<a href="{% url 'stock:producto_list' %}" class="btn-accion btn-volver">Volver</a>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{{ evento.nombre }}</h1>
+<p><strong>Fecha:</strong> {{ evento.fecha }}</p>
+<p><strong>Asistentes:</strong> {{ evento.asistentes|default:"—" }}</p>
+<p><strong>Estado:</strong> {{ evento.get_estado_display }}</p>
+<p><strong>Paquete:</strong> {{ evento.paquete.nombre|default:"—" }}</p>
+<p><strong>Menú:</strong> {{ evento.menu.nombre|default:"—" }}</p>
+<p><strong>Teléfono de contacto:</strong> {{ evento.telefono_contacto|default:"—" }}</p>
+<p>{{ evento.notas }}</p>
+
+<h4>Consumo</h4>
+<div class="tabla-wrapper">
+<table class="table">
+    <thead><tr><th>Producto</th><th>Tipo</th><th class="text-end">Cantidad</th><th></th></tr></thead>
+    <tbody>
+        {% for m in evento.movimientos.all %}
+        <tr>
+            <td>{{ m.producto.nombre }}</td>
+            <td>{{ m.get_tipo_display }}</td>
+            <td class="text-end">{{ m.cantidad }}</td>
+            <td>
+                <div class="acciones-fila">
+                    <a href="{% url 'stock:movimientostock_update' m.pk %}" class="btn-accion btn-editar">Editar</a>
+                    <a href="{% url 'stock:movimientostock_delete' m.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">Sin movimientos registrados.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+<h4>Personal asignado</h4>
+<div class="tabla-wrapper">
+<table class="table">
+    <thead><tr><th>Empleado</th><th>Puesto</th><th class="text-end">Horas</th><th class="text-end">Pago</th><th></th></tr></thead>
+    <tbody>
+        {% for p in evento.personal.all %}
+        <tr>
+            <td>{{ p.empleado.nombre }}</td>
+            <td>{{ p.puesto }}</td>
+            <td class="text-end">{{ p.horas_trabajadas }}</td>
+            <td class="text-end">${{ p.pago }}</td>
+            <td>
+                <div class="acciones-fila">
+                    <a href="{% url 'stock:personalevento_update' p.pk %}" class="btn-accion btn-editar">Editar</a>
+                    <a href="{% url 'stock:personalevento_delete' p.pk %}" class="btn-accion btn-eliminar">Quitar</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">Sin personal asignado.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+<p><strong>Gasto total del evento: ${{ evento.gasto_total }}</strong></p>
+
+<a href="{% url 'stock:evento_update' evento.pk %}" class="btn-accion btn-editar">Editar evento</a>
+<a href="{% url 'stock:evento_delete' evento.pk %}" class="btn-accion btn-eliminar">Eliminar evento</a>
+<a href="{% url 'stock:evento_list' %}" class="btn-accion btn-volver">Volver</a>
+
+{% endblock %}

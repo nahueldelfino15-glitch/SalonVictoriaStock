@@ -1,0 +1,10 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>Eliminar menú</h1>
+<p>¿Seguro que querés eliminar <strong>{{ menu.nombre }}</strong>?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn-accion btn-eliminar">Sí, eliminar</button>
+    <a href="{% url 'stock:menu_list' %}" class="btn-accion btn-volver">Cancelar</a>
+</form>
+{% endblock %}

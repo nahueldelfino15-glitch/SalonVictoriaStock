@@ -1,0 +1,13 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{{ paquete.nombre }}</h1>
+<ul class="list-group mb-3">
+    <li class="list-group-item"><strong>Descripción:</strong> {{ paquete.descripcion|default:"—" }}</li>
+    <li class="list-group-item"><strong>Precio:</strong> {% if paquete.precio %}${{ paquete.precio }}{% else %}—{% endif %}</li>
+</ul>
+<div class="acciones-fila">
+    <a href="{% url 'stock:paquete_update' paquete.pk %}" class="btn-accion btn-editar">Editar</a>
+    <a href="{% url 'stock:paquete_delete' paquete.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+    <a href="{% url 'stock:paquete_list' %}" class="btn-accion btn-volver">Volver</a>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+<div class="tabla-wrapper">
+<table class="table">
+    <thead>
+        <tr><th>Nombre</th><th class="text-end">Stock</th><th class="text-end">Precio</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for producto in productos %}
+        <tr>
+            <td>{{ producto.nombre }}</td>
+            <td class="text-end">{{ producto.stock_actual }}</td>
+            <td class="text-end">${{ producto.precio_unitario }}</td>
+            <td>
+                <div class="acciones-fila">
+                    <a href="{% url 'stock:producto_detail' producto.pk %}" class="btn-accion btn-ver">Ver</a>
+                    <a href="{% url 'stock:producto_delete' producto.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No hay productos cargados en este sector.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>

@@ -1,0 +1,69 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Personal</h1>
+    <button type="button" class="btn btn-vino" data-bs-toggle="modal" data-bs-target="#nuevoEmpleadoModal">+ Nuevo empleado</button>
+</div>
+
+<form method="get" class="buscador">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar personal...">
+    <button type="submit">🔍</button>
+</form>
+
+<div class="tabla-wrapper">
+<table class="table">
+    <thead>
+        <tr><th>Nombre</th><th>Teléfono</th><th>Puesto habitual</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for empleado in empleados %}
+        <tr>
+            <td>{{ empleado.nombre }}</td>
+            <td>{{ empleado.telefono }}</td>
+            <td>{{ empleado.puesto_habitual }}</td>
+            <td>
+                <div class="acciones-fila">
+                    <a href="{% url 'stock:empleado_update' empleado.pk %}" class="btn-accion btn-editar">Editar</a>
+                    <a href="{% url 'stock:empleado_delete' empleado.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No hay personal cargado todavía.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<div class="modal fade" id="nuevoEmpleadoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo empleado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'stock:empleado_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="nombre" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Teléfono</label>
+                        <input type="text" name="telefono" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Puesto habitual</label>
+                        <input type="text" name="puesto_habitual" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-accion btn-volver" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-vino">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

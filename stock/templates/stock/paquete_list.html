@@ -1,0 +1,61 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Paquetes</h1>
+    <button type="button" class="btn btn-vino" data-bs-toggle="modal" data-bs-target="#nuevoPaqueteModal">+ Nuevo paquete</button>
+</div>
+<div class="tabla-wrapper">
+<table class="table">
+    <thead><tr><th>Nombre</th><th>Descripción</th><th class="text-end">Precio</th><th></th></tr></thead>
+    <tbody>
+        {% for paquete in paquetes %}
+        <tr>
+            <td>{{ paquete.nombre }}</td>
+            <td>{{ paquete.descripcion|truncatechars:60 }}</td>
+            <td class="text-end">{% if paquete.precio %}${{ paquete.precio }}{% else %}—{% endif %}</td>
+            <td>
+                <div class="acciones-fila">
+                    <a href="{% url 'stock:paquete_update' paquete.pk %}" class="btn-accion btn-editar">Editar</a>
+                    <a href="{% url 'stock:paquete_delete' paquete.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No hay paquetes cargados todavía.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<div class="modal fade" id="nuevoPaqueteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo paquete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'stock:paquete_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="nombre" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="descripcion" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Precio</label>
+                        <input type="number" step="0.01" name="precio" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-accion btn-volver" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-vino">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

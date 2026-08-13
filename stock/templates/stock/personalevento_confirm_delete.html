@@ -1,0 +1,10 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>Quitar personal del evento</h1>
+<p>¿Seguro que querés quitar a <strong>{{ object.empleado.nombre }}</strong> de "{{ object.evento.nombre }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sí, quitar</button>
+    <a href="{% url 'stock:evento_detail' object.evento.pk %}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

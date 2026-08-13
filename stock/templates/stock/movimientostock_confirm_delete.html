@@ -1,0 +1,10 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>Eliminar movimiento</h1>
+<p>¿Seguro que querés eliminar este movimiento de <strong>{{ object.producto.nombre }}</strong> ({{ object.get_tipo_display }} x{{ object.cantidad }})? El stock del producto se va a recalcular automáticamente.</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+    <a href="{% url 'stock:evento_detail' object.evento.pk %}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

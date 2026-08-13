@@ -1,0 +1,316 @@
+ {% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="icon" type="image/png" href="/static/stock/img/LogoVictoria.png">
+    <title>Control de Stock - Salón Victoria</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+    .acciones-fila { display: flex; gap: .4rem; flex-wrap: wrap; }
+    .btn-accion { min-width: 76px; text-align: center; }
+    .text-end { text-align: right; }
+:root {
+        --vino: #141414;
+        --vino-claro: #2c2c2c;
+        --dorado: #d4a017;
+        --dorado-suave: #f3e2b3;
+        --crema: #faf8f5;
+        --texto: #1a1a1a;
+        --gris: #8a8a8a;
+    }
+
+    body { font-family: 'Inter', sans-serif; background: var(--crema); color: var(--texto); }
+    h1, h2, h3, .cal-titulo { font-family: 'Fraunces', serif; }
+
+    .calendario-wrapper {
+        background: #fff;
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(74, 25, 66, 0.08);
+    }
+
+    .calendario-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+    }
+
+    .cal-titulo { font-size: 1.8rem; font-weight: 700; color: var(--vino); margin: 0; }
+    .cal-anio { color: var(--dorado); font-weight: 600; }
+
+    .cal-nav {
+        width: 40px; height: 40px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--crema); color: var(--vino); text-decoration: none;
+        font-size: 1.3rem; transition: all .2s;
+    }
+    .cal-nav:hover { background: var(--vino); color: #fff; }
+
+    .calendario-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+    }
+
+    .cal-diasemana {
+        text-align: center; font-size: .75rem; font-weight: 600; letter-spacing: .08em;
+        text-transform: uppercase; color: var(--gris); padding-bottom: .5rem;
+    }
+
+    .cal-dia {
+        min-height: 90px; border-radius: 12px; padding: .5rem;
+        background: var(--crema); transition: background .2s;
+    }
+    .cal-dia:hover { background: var(--dorado-suave); }
+    .cal-vacio { background: transparent; }
+
+    .cal-numero {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 26px; height: 26px; font-weight: 600; font-size: .85rem;
+        border-radius: 50%;
+    }
+
+    .cal-hoy { box-shadow: inset 0 0 0 2px var(--dorado); background: #fff; }
+    .cal-hoy .cal-numero { background: var(--dorado); color: #fff; }
+
+    .cal-evento {
+        display: block; margin-top: .35rem; font-size: .7rem; padding: .2rem .4rem;
+        background: var(--vino); color: #fff; border-radius: 6px;
+        text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .cal-evento:hover { background: var(--vino-claro); color: #fff; }
+
+    @media (max-width: 576px) {
+        .cal-dia { min-height: 60px; padding: .3rem; }
+        .cal-evento { font-size: .6rem; }
+        .cal-titulo { font-size: 1.3rem; }
+    }
+    .panel-btn {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: .5rem; height: 100%;
+        background: var(--vino); color: #fff;
+        border-radius: 16px; padding: 1.8rem 1rem;
+        text-decoration: none;
+        font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.1rem;
+        box-shadow: 0 6px 20px rgba(74, 25, 66, 0.15);
+        transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+        position: relative; overflow: hidden;
+    }
+    .panel-btn:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(74, 25, 66, 0.25);
+        background: var(--vino-claro);
+        color: #fff;
+    }
+    .panel-btn::after {
+        content: '';
+        position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+        width: 0; height: 3px; background: var(--dorado);
+        transition: width .3s ease;
+    }
+    .panel-btn:hover::after { width: 60%; }
+    .panel-icono { font-size: 1.8rem; }
+
+    .btn-vino { background: var(--vino); color: #fff; border: none; }
+    .btn-vino:hover { background: var(--vino-claro); color: #fff; }
+
+    .eventos-lista {
+        background: #fff; border-radius: 20px; padding: .75rem;
+        box-shadow: 0 10px 30px rgba(74, 25, 66, 0.08);
+    }
+    .evento-fila {
+        display: flex; align-items: center; gap: 1rem;
+        padding: .75rem 1rem; border-radius: 12px;
+        text-decoration: none; color: var(--texto);
+        transition: background .2s;
+    }
+    .evento-fila:hover { background: var(--crema); }
+    .evento-fecha {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: var(--vino); color: #fff; border-radius: 10px;
+        width: 50px; height: 50px; flex-shrink: 0;
+    }
+    .evento-fecha .num { font-size: 1.1rem; font-weight: 700; line-height: 1; font-family: 'Fraunces', serif; }
+    .evento-fecha .mes { font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; }
+    .evento-nombre { font-weight: 600; flex: 1; }
+    .evento-vacio { color: var(--gris); padding: 1rem; text-align: center; }
+
+    .navbar-vino {
+        background: var(--vino);
+        padding: 1rem 0;
+        margin-bottom: 2rem;
+    }
+    .navbar-vino .navbar-brand {
+        font-family: 'Fraunces', serif;
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: #fff !important;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+    }
+    .navbar-vino .navbar-brand img {
+        height: 55px;
+        width: auto;
+    }
+    .navbar-vino .navbar-brand:hover { color: var(--dorado-suave) !important; }
+
+    .nav-link-vino {
+        color: rgba(255, 255, 255, 0.85) !important;
+        text-decoration: none;
+        padding: .4rem .9rem;
+        border-radius: 20px;
+        font-size: .9rem;
+        font-weight: 500;
+        transition: all .2s ease;
+        display: inline-block;
+    }
+    .nav-link-vino:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff !important;
+    }
+
+    .nav-link-admin {
+        color: var(--dorado) !important;
+        border: 1px solid var(--dorado);
+        padding: .35rem .9rem;
+        border-radius: 20px;
+        font-size: .85rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all .2s ease;
+    }
+    .nav-link-admin:hover {
+        background: var(--dorado);
+        color: var(--vino) !important;
+    }
+    .btn-accion {
+        display: inline-block;
+        padding: .45rem 1rem;
+        border-radius: 20px;
+        font-size: .85rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 1.5px solid transparent;
+        transition: all .2s ease;
+    }
+    .btn-ver { color: var(--vino); border-color: var(--vino); }
+    .btn-ver:hover { background: var(--vino); color: #fff; }
+
+    .btn-editar { color: var(--dorado); border-color: var(--dorado); }
+    .btn-editar:hover { background: var(--dorado); color: #fff; }
+
+    .btn-eliminar { color: #b23a48; border-color: #b23a48; }
+    .btn-eliminar:hover { background: #b23a48; color: #fff; }
+
+    .btn-volver { color: var(--gris); border-color: var(--gris); }
+    .btn-volver:hover { background: var(--gris); color: #fff; }
+
+    .tabla-wrapper {
+        background: #fff;
+        border-radius: 20px;
+        padding: 1.25rem;
+        box-shadow: 0 10px 30px rgba(20, 20, 20, 0.08);
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+    }
+    .tabla-wrapper table { margin-bottom: 0; }
+    .tabla-wrapper thead th {
+        border: none;
+        color: var(--gris);
+        text-transform: uppercase;
+        font-size: .75rem;
+        letter-spacing: .05em;
+        font-weight: 600;
+        padding-bottom: .75rem;
+    }
+    .tabla-wrapper tbody td {
+        border-top: 1px solid #f0ece6;
+        vertical-align: middle;
+        padding: .75rem .5rem;
+    }
+    .tabla-wrapper tbody tr:hover { background: var(--crema); }
+    .buscador {
+        display: flex; align-items: center; gap: .5rem;
+        background: #fff; border-radius: 24px;
+        padding: .4rem .5rem .4rem 1.2rem;
+        box-shadow: 0 4px 14px rgba(20, 20, 20, 0.06);
+        margin-bottom: 1.5rem;
+        max-width: 420px;
+    }
+    .buscador input {
+        border: none; outline: none; flex: 1;
+        font-family: 'Inter', sans-serif; font-size: .9rem; background: transparent;
+    }
+    .buscador button {
+        background: var(--vino); color: #fff; border: none; border-radius: 50%;
+        width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: background .2s; flex-shrink: 0; font-size: .9rem;
+    }
+    .buscador button:hover { background: var(--vino-claro); }
+    
+</style>
+</head>
+<body>
+<nav class="navbar-vino">
+        <div class="container d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <a class="navbar-brand mb-0" href="{% url 'stock:home' %}">
+                <img src="{% static 'stock/img/LogoVictoria.png' %}" alt="Logo">
+                Salón - Control General
+            </a>
+            <div class="d-flex flex-wrap align-items-center gap-1">
+                <a class="nav-link-vino" href="{% url 'stock:producto_list' %}">Productos</a>
+                <a class="nav-link-vino" href="{% url 'stock:evento_list' %}">Eventos</a>
+                <a class="nav-link-vino" href="{% url 'stock:empleado_list' %}">Personal</a>
+                <a class="nav-link-vino" href="{% url 'stock:calendario' %}">Calendario</a>
+                <a class="nav-link-vino" href="{% url 'stock:paquete_list' %}">Paquetes</a>
+                <a class="nav-link-vino" href="{% url 'stock:menu_list' %}">Menús</a>
+                <a class="nav-link-vino" href="{% url 'stock:compras' %}">Compras</a>
+                <a class="nav-link-vino" href="{% url 'stock:consumo_selector' %}">Consumo</a>
+                <a class="nav-link-admin" href="/admin/">Admin</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+
+{% if messages %}
+    <div class="modal fade" id="mensajeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Aviso</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% for message in messages %}
+                    <p class="mb-1 {% if 'error' in message.tags %}text-danger{% elif 'success' in message.tags %}text-success{% endif %}">{{ message }}</p>
+                    {% endfor %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-vino" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var modalEl = document.getElementById('mensajeModal');
+            if (modalEl) {
+                var modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        });
+    </script>
+    {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

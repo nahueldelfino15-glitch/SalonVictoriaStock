@@ -1,0 +1,38 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Historial de eventos</h1>
+    <a href="{% url 'stock:evento_list' %}" class="btn-accion btn-volver">Volver a eventos</a>
+</div>
+
+<form method="get" class="buscador">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar evento...">
+    <button type="submit">🔍</button>
+</form>
+
+<div class="tabla-wrapper">
+<table class="table">
+    <thead>
+        <tr><th>Nombre</th><th>Fecha</th><th>Estado</th><th class="text-end">Gasto total</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for evento in eventos %}
+        <tr>
+            <td>{{ evento.nombre }}</td>
+            <td>{{ evento.fecha }}</td>
+            <td>{{ evento.get_estado_display }}</td>
+            <td class="text-end">${{ evento.gasto_total }}</td>
+            <td>
+                <div class="acciones-fila">
+                    <a href="{% url 'stock:evento_detail' evento.pk %}" class="btn-accion btn-ver">Ver</a>
+                    <a href="{% url 'stock:evento_delete' evento.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">No hay eventos finalizados todavía.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

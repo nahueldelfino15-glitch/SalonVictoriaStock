@@ -1,0 +1,10 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{% if object %}Editar producto{% else %}Nuevo producto{% endif %}</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Guardar</button>
+    <a href="{% url 'stock:producto_list' %}" class="btn-accion btn-volver">Cancelar</a>
+</form>
+{% endblock %}

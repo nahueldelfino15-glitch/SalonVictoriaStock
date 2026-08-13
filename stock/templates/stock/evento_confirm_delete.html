@@ -1,0 +1,10 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>Eliminar evento</h1>
+<p>¿Seguro que querés eliminar <strong>{{ evento.nombre }}</strong> y todos sus datos asociados (personal, consumo)? Esta acción no se puede deshacer.</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+    <a href="{% url 'stock:evento_list' %}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Stock</h1>
+    <button type="button" class="btn btn-vino" data-bs-toggle="modal" data-bs-target="#nuevoProductoModal">+ Nuevo producto</button>
+</div>
+
+<form method="get" class="buscador">
+    <input type="text" name="q" value="{{ q }}" placeholder="Buscar producto...">
+    <button type="submit">🔍</button>
+</form>
+
+<h3 class="mt-4">Barra</h3>
+{% include 'stock/_tabla_productos.html' with productos=productos_barra %}
+
+<h3 class="mt-4">Cocina</h3>
+{% include 'stock/_tabla_productos.html' with productos=productos_cocina %}
+
+<h3 class="mt-4">Extras</h3>
+{% include 'stock/_tabla_productos.html' with productos=productos_extras %}
+
+<div class="modal fade" id="nuevoProductoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nuevo producto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'stock:producto_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="nombre" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Sector</label>
+                        <select name="sector" class="form-select" required>
+                            <option value="barra">Barra</option>
+                            <option value="cocina">Cocina</option>
+                            <option value="extras">Extras</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Precio unitario</label>
+                        <input type="number" step="0.01" name="precio_unitario" class="form-control" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Stock inicial</label>
+                        <input type="number" name="stock_actual" class="form-control" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unidad de medida</label>
+                        <input type="text" name="unidad_medida" class="form-control" value="unidad">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-accion btn-volver" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-vino">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<div class="calendario-wrapper mb-4">
+    <div class="calendario-header">
+        <a href="{% url 'stock:home' %}?year={{ mes_anterior.year }}&month={{ mes_anterior.month }}" class="cal-nav">‹</a>
+        <h2 class="cal-titulo">{{ nombre_mes }} <span class="cal-anio">{{ year }}</span></h2>
+        <a href="{% url 'stock:home' %}?year={{ mes_siguiente.year }}&month={{ mes_siguiente.month }}" class="cal-nav">›</a>
+    </div>
+    <div class="calendario-grid">
+        <div class="cal-diasemana">Lun</div>
+        <div class="cal-diasemana">Mar</div>
+        <div class="cal-diasemana">Mié</div>
+        <div class="cal-diasemana">Jue</div>
+        <div class="cal-diasemana">Vie</div>
+        <div class="cal-diasemana">Sáb</div>
+        <div class="cal-diasemana">Dom</div>
+
+        {% for semana in semanas %}
+            {% for dia in semana %}
+                {% if dia %}
+                <div class="cal-dia {% if dia.es_hoy %}cal-hoy{% endif %}">
+                    <span class="cal-numero">{{ dia.numero }}</span>
+                    {% for evento in dia.eventos %}
+                    <a href="{% url 'stock:evento_detail' evento.pk %}" class="cal-evento">{{ evento.nombre|truncatechars:14 }}</a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="cal-dia cal-vacio"></div>
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    </div>
+</div>
+
+<h3 class="mt-5">Próximos eventos</h3>
+<ul class="list-group">
+    {% for evento in proximos %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+        <a href="{% url 'stock:evento_detail' evento.pk %}">{{ evento.nombre }}</a>
+        <span class="badge bg-primary rounded-pill">{{ evento.fecha }}</span>
+    </li>
+    {% empty %}
+    <li class="list-group-item">No hay eventos próximos cargados.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

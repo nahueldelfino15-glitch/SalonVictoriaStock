@@ -1,0 +1,30 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{{ empleado.nombre }}</h1>
+<ul class="list-group mb-3">
+    <li class="list-group-item"><strong>Teléfono:</strong> {{ empleado.telefono|default:"—" }}</li>
+    <li class="list-group-item"><strong>Puesto habitual:</strong> {{ empleado.puesto_habitual|default:"—" }}</li>
+</ul>
+
+<h4>Historial de eventos</h4>
+<table class="table table-sm">
+    <thead><tr><th>Evento</th><th>Fecha</th><th>Puesto</th><th>Horas</th><th>Pago</th></tr></thead>
+    <tbody>
+        {% for pe in empleado.eventos_trabajados.all %}
+        <tr>
+            <td>{{ pe.evento.nombre }}</td>
+            <td>{{ pe.evento.fecha }}</td>
+            <td>{{ pe.puesto }}</td>
+            <td>{{ pe.horas_trabajadas }}</td>
+            <td>${{ pe.pago }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5">Todavía no trabajó en ningún evento.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<a href="{% url 'stock:empleado_update' empleado.pk %}" class="btn btn-warning">Editar</a>
+<a href="{% url 'stock:empleado_delete' empleado.pk %}" class="btn btn-danger">Eliminar</a>
+<a href="{% url 'stock:empleado_list' %}" class="btn btn-secondary">Volver</a>
+{% endblock %}

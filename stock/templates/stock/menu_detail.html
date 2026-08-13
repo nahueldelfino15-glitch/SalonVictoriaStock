@@ -1,0 +1,12 @@
+{% extends 'stock/base.html' %}
+{% block content %}
+<h1>{{ menu.nombre }}</h1>
+<ul class="list-group mb-3">
+    <li class="list-group-item"><strong>Descripción:</strong> {{ menu.descripcion|default:"—" }}</li>
+</ul>
+<div class="acciones-fila">
+    <a href="{% url 'stock:menu_update' menu.pk %}" class="btn-accion btn-editar">Editar</a>
+    <a href="{% url 'stock:menu_delete' menu.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
+    <a href="{% url 'stock:menu_list' %}" class="btn-accion btn-volver">Volver</a>
+</div>
+{% endblock %}
