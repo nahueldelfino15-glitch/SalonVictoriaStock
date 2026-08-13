@@ -14,7 +14,9 @@ from .models import (
     MovimientoStock,
     Paquete,
     PersonalEvento,
+    Plato,
     Producto,
+    Puesto,
 )
 
 
@@ -39,11 +41,14 @@ class PaqueteAdmin(admin.ModelAdmin):
     ordering = ('nombre',)
 
 
-class LineaRecetaMenuInline(admin.TabularInline):
-    model = LineaReceta
+class PlatoMenuInline(admin.TabularInline):
+    """Django no anida inlines: los ingredientes se cargan entrando al plato."""
+
+    model = Plato
     extra = 1
-    fields = ('producto', 'cantidad_por_persona')
+    fields = ('paso', 'nombre')
     fk_name = 'menu'
+    show_change_link = True
 
 
 @admin.register(Menu)
@@ -51,16 +56,43 @@ class MenuAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'costo_por_persona')
     search_fields = ('nombre',)
     ordering = ('nombre',)
-    inlines = [LineaRecetaMenuInline]
+    inlines = [PlatoMenuInline]
 
     @admin.display(description='Costo por cubierto')
     def costo_por_persona(self, obj):
         return obj.costo_por_persona
 
 
+class LineaRecetaInline(admin.TabularInline):
+    model = LineaReceta
+    extra = 1
+    fields = ('producto', 'cantidad_por_persona')
+
+
+@admin.register(Plato)
+class PlatoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'paso', 'menu', 'evento', 'costo_por_persona')
+    list_filter = ('paso',)
+    search_fields = ('nombre',)
+    list_select_related = ('menu', 'evento')
+    inlines = [LineaRecetaInline]
+
+    @admin.display(description='Costo por persona')
+    def costo_por_persona(self, obj):
+        return obj.costo_por_persona
+
+
+@admin.register(Puesto)
+class PuestoAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+
 @admin.register(Empleado)
 class EmpleadoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'puesto_habitual', 'telefono')
+    list_filter = ('puesto_habitual',)
+    list_select_related = ('puesto_habitual',)
     search_fields = ('nombre',)
     ordering = ('nombre',)
 

@@ -8,6 +8,19 @@
 <title>Control de Stock - Salón Victoria</title>
 <link rel="icon" type="image/png" href="{% static 'stock/img/LogoVictoria.png' %}">
 
+<script>
+  /* El estado del panel se aplica ANTES del primer pintado: si esperara al
+     DOMContentLoaded, cada carga mostraría el panel abierto y lo cerraría de
+     golpe a la vista del usuario. */
+  (function () {
+    try {
+      if (window.localStorage.getItem('victoria:sidebar') === 'colapsado') {
+        document.documentElement.setAttribute('data-sidebar', 'colapsado');
+      }
+    } catch (e) { /* navegación privada: se queda abierto y listo */ }
+  })();
+</script>
+
 <!-- ========================= Fuentes ========================= -->
 <link href="https://fonts.googleapis.com" rel="preconnect">
 <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
@@ -159,6 +172,36 @@
     box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
   }
 
+  /* ==========================================================================
+     PANEL LATERAL
+     El ancho y el margen del contenido se manejan por CSS y no con clases de
+     Tailwind toggleadas por JS: así el estado se aplica en el <html> antes del
+     primer pintado y no hay salto visible al cargar.
+     ========================================================================== */
+  .sidebar {
+    width: 248px;
+    transition: width .2s ease, transform .2s ease;
+  }
+  .contenido { margin-left: 248px; transition: margin-left .2s ease; }
+
+  html[data-sidebar="colapsado"] .sidebar { width: 76px; }
+  html[data-sidebar="colapsado"] .contenido { margin-left: 76px; }
+  html[data-sidebar="colapsado"] .sidebar-label,
+  html[data-sidebar="colapsado"] .sidebar-grupo { display: none; }
+  html[data-sidebar="colapsado"] .sidebar-item { justify-content: center; padding-left: 0; padding-right: 0; }
+
+  /* En pantallas chicas el panel no se encoge: entra y sale completo. */
+  @media (max-width: 767px) {
+    .sidebar { transform: translateX(-100%); width: 248px; }
+    .contenido { margin-left: 0; }
+    html[data-sidebar="colapsado"] .sidebar { width: 248px; }
+    html[data-sidebar="colapsado"] .contenido { margin-left: 0; }
+    html[data-sidebar="colapsado"] .sidebar-label,
+    html[data-sidebar="colapsado"] .sidebar-grupo { display: block; }
+    html[data-sidebar="colapsado"] .sidebar-item { justify-content: flex-start; padding-left: 16px; padding-right: 16px; }
+    html[data-sidebar-mobile="abierto"] .sidebar { transform: translateX(0); }
+  }
+
   /* --- Form Element Styling overrides for the dark luxury theme ---------- */
   html input[type="text"],
   html input[type="number"],
@@ -234,6 +277,10 @@
   ::-webkit-scrollbar-track { background: #0a0a0a; }
   ::-webkit-scrollbar-thumb { background: #242424; border-radius: 9999px; }
   ::-webkit-scrollbar-thumb:hover { background: #4d4635; }
+
+  /* --- Latido del esqueleto mientras carga un modal ---------------------- */
+  @keyframes latido { 0%, 100% { opacity: .35; } 50% { opacity: .15; } }
+  .cargando { animation: latido 1.2s ease-in-out infinite; }
 </style>
 </head>
 
@@ -249,81 +296,107 @@ prendería TODO el nav.
 {% endcomment %}
 {% with nombre_ruta=request.resolver_match.url_name|default:"__sin_ruta__" %}
 {% with un="|"|add:nombre_ruta|add:"|" %}
-{% with cls_on="h-full flex items-center border-b-2 border-primary text-primary font-bold transition-colors duration-200 whitespace-nowrap" cls_off="h-full flex items-center border-b-2 border-transparent text-secondary hover:text-primary transition-colors duration-200 whitespace-nowrap" cls_mon="block px-stack-md py-3 border-l-2 border-primary text-primary font-bold bg-surface-container-low" cls_moff="block px-stack-md py-3 border-l-2 border-transparent text-secondary hover:text-primary hover:bg-surface-container-low transition-colors" %}
+{% with cls_on="sidebar-item flex items-center gap-stack-md h-11 px-stack-md rounded-lg border-l-2 border-primary bg-surface-container-low text-primary font-semibold transition-colors" cls_off="sidebar-item flex items-center gap-stack-md h-11 px-stack-md rounded-lg border-l-2 border-transparent text-secondary hover:text-primary hover:bg-surface-container-low transition-colors" %}
 
-<!-- ============================ TopNavBar ============================ -->
-<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center gap-stack-md px-stack-md lg:px-container-padding h-20 bg-surface-container-lowest border-b border-outline-variant ambient-shadow">
+<!-- ============================ Barra superior ============================ -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center gap-stack-md px-stack-md lg:px-stack-lg h-16 bg-surface-container-lowest border-b border-outline-variant ambient-shadow">
 
-  <a class="flex items-center gap-stack-sm lg:gap-stack-md shrink-0 group" href="{% url 'stock:home' %}">
-    <img alt="Salón Victoria" class="h-10 w-auto object-contain" src="{% static 'stock/img/LogoVictoria.png' %}">
-    <span class="font-display-lg text-[22px] lg:text-display-lg font-semibold leading-none text-on-background group-hover:text-primary transition-colors">Victoria</span>
-  </a>
+  <div class="flex items-center gap-stack-sm min-w-0">
+    <button type="button" id="sidebarToggle" aria-label="Contraer o expandir el menú" aria-controls="sidebar"
+            class="shrink-0 p-unit text-secondary hover:text-primary transition-colors rounded-pill hover:bg-surface-container-low">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
 
-  <!-- Nav escritorio -->
-  <nav class="hidden md:flex items-center gap-stack-sm lg:gap-gutter h-full font-body-sm text-body-sm lg:text-body-md">
-    <a class="{% if un in '|producto_list|producto_detail|producto_create|producto_update|producto_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:producto_list' %}">Productos</a>
-    <a class="{% if un in '|evento_list|evento_detail|evento_create|evento_update|evento_delete|evento_historial|personalevento_create|personalevento_update|personalevento_delete|movimientostock_create|movimientostock_update|movimientostock_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:evento_list' %}">Eventos</a>
-    <a class="{% if un in '|empleado_list|empleado_detail|empleado_create|empleado_update|empleado_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:empleado_list' %}">Personal</a>
-    <a class="{% if un in '|calendario|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:calendario' %}">Calendario</a>
-    <a class="{% if un in '|paquete_list|paquete_detail|paquete_create|paquete_update|paquete_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:paquete_list' %}">Paquetes</a>
-    <a class="{% if un in '|menu_list|menu_detail|menu_create|menu_update|menu_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:menu_list' %}">Menús</a>
-    <a class="{% if un in '|compras|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:compras' %}">Compras</a>
-    <a class="{% if un in '|merma|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:merma' %}">Merma</a>
-    <a class="{% if un in '|consumo_selector|consumo_evento|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:consumo_selector' %}">Consumo</a>
-    <a class="{{ cls_off }}" href="/admin/">Admin</a>
-    {% if user.is_authenticated %}
-    <form method="post" action="{% url 'stock:logout' %}" class="flex items-center ml-stack-sm pl-stack-sm border-l border-outline-variant">
-      {% csrf_token %}
-      <button type="submit" title="Salir ({{ user.get_username }})" aria-label="Cerrar sesión"
-              class="inline-flex items-center gap-unit text-on-surface-med hover:text-primary transition-colors">
-        <span class="material-symbols-outlined text-[20px]">logout</span>
-      </button>
-    </form>
-    {% endif %}
-  </nav>
+    <a class="flex items-center gap-stack-sm shrink-0 group min-w-0" href="{% url 'stock:home' %}">
+      <img alt="Salón Victoria" class="h-9 w-auto object-contain" src="{% static 'stock/img/LogoVictoria.png' %}">
+      <span class="font-display-lg text-[20px] font-semibold leading-none text-on-background group-hover:text-primary transition-colors truncate">Victoria</span>
+    </a>
+  </div>
 
-  <!-- Hamburguesa (mobile) -->
-  <button type="button" id="navToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navMobile"
-          class="md:hidden shrink-0 p-unit text-secondary hover:text-primary transition-colors rounded-pill hover:bg-surface-container-low">
-    <span class="material-symbols-outlined" id="navToggleIcon">menu</span>
-  </button>
-</header>
-
-<!-- Nav mobile -->
-<nav id="navMobile" class="hidden md:hidden fixed top-20 left-0 w-full z-40 bg-surface-container-lowest border-b border-outline-variant max-h-[calc(100vh-5rem)] overflow-y-auto font-body-md text-body-md">
-  <a class="{% if un in '|producto_list|producto_detail|producto_create|producto_update|producto_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:producto_list' %}">Productos</a>
-  <a class="{% if un in '|evento_list|evento_detail|evento_create|evento_update|evento_delete|evento_historial|personalevento_create|personalevento_update|personalevento_delete|movimientostock_create|movimientostock_update|movimientostock_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:evento_list' %}">Eventos</a>
-  <a class="{% if un in '|empleado_list|empleado_detail|empleado_create|empleado_update|empleado_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:empleado_list' %}">Personal</a>
-  <a class="{% if un in '|calendario|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:calendario' %}">Calendario</a>
-  <a class="{% if un in '|paquete_list|paquete_detail|paquete_create|paquete_update|paquete_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:paquete_list' %}">Paquetes</a>
-  <a class="{% if un in '|menu_list|menu_detail|menu_create|menu_update|menu_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:menu_list' %}">Menús</a>
-  <a class="{% if un in '|compras|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:compras' %}">Compras</a>
-  <a class="{% if un in '|merma|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:merma' %}">Merma</a>
-  <a class="{% if un in '|consumo_selector|consumo_evento|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:consumo_selector' %}">Consumo</a>
-  <a class="{{ cls_moff }}" href="/admin/">Admin</a>
   {% if user.is_authenticated %}
-  <form method="post" action="{% url 'stock:logout' %}">
+  <form method="post" action="{% url 'stock:logout' %}" class="flex items-center shrink-0">
     {% csrf_token %}
-    <button type="submit" class="{{ cls_moff }} w-full text-left flex items-center gap-stack-sm">
-      <span class="material-symbols-outlined text-[20px]">logout</span>Salir ({{ user.get_username }})
+    <button type="submit" title="Salir ({{ user.get_username }})" aria-label="Cerrar sesión"
+            class="inline-flex items-center gap-unit text-on-surface-med hover:text-primary transition-colors px-stack-sm py-unit rounded-pill hover:bg-surface-container-low">
+      <span class="material-symbols-outlined text-[20px]">logout</span>
+      <span class="hidden sm:inline font-body-sm text-body-sm">{{ user.get_username }}</span>
     </button>
   </form>
   {% endif %}
-</nav>
+</header>
+
+<!-- ============================ Panel lateral ============================ -->
+<aside id="sidebar" class="sidebar fixed top-16 left-0 bottom-0 z-40 bg-surface-container-lowest border-r border-outline-variant overflow-y-auto overflow-x-hidden py-stack-md">
+  <nav class="flex flex-col gap-unit px-stack-sm font-body-md text-body-md" aria-label="Navegación principal">
+
+    <a title="Panel" class="{% if un in '|home|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:home' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">dashboard</span><span class="sidebar-label truncate">Panel</span>
+    </a>
+    <a title="Calendario" class="{% if un in '|calendario|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:calendario' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">calendar_month</span><span class="sidebar-label truncate">Calendario</span>
+    </a>
+
+    <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Stock</p>
+    <a title="Productos" class="{% if un in '|producto_list|producto_detail|producto_create|producto_update|producto_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:producto_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">inventory_2</span><span class="sidebar-label truncate">Productos</span>
+    </a>
+    <a title="Compras" class="{% if un in '|compras|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:compras' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">shopping_cart</span><span class="sidebar-label truncate">Compras</span>
+    </a>
+    <a title="Merma" class="{% if un in '|merma|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:merma' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">delete_sweep</span><span class="sidebar-label truncate">Merma</span>
+    </a>
+
+    <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Eventos</p>
+    <a title="Eventos" class="{% if un in '|evento_list|evento_detail|evento_create|evento_update|evento_delete|personalevento_create|personalevento_update|personalevento_delete|movimientostock_create|movimientostock_update|movimientostock_delete|cargoevento_create|cargoevento_update|cargoevento_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:evento_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">celebration</span><span class="sidebar-label truncate">Eventos</span>
+    </a>
+    <a title="Consumo" class="{% if un in '|consumo_selector|consumo_evento|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:consumo_selector' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">local_bar</span><span class="sidebar-label truncate">Consumo</span>
+    </a>
+    <a title="Historial" class="{% if un in '|evento_historial|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:evento_historial' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">history</span><span class="sidebar-label truncate">Historial</span>
+    </a>
+
+    <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Catálogos</p>
+    <a title="Menús" class="{% if un in '|menu_list|menu_detail|menu_create|menu_update|menu_delete|plato_create|plato_detail|plato_update|plato_delete|lineareceta_create|lineareceta_update|lineareceta_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:menu_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">restaurant_menu</span><span class="sidebar-label truncate">Menús</span>
+    </a>
+    <a title="Paquetes" class="{% if un in '|paquete_list|paquete_detail|paquete_create|paquete_update|paquete_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:paquete_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">package_2</span><span class="sidebar-label truncate">Paquetes</span>
+    </a>
+    <a title="Personal" class="{% if un in '|empleado_list|empleado_detail|empleado_create|empleado_update|empleado_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:empleado_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">groups</span><span class="sidebar-label truncate">Personal</span>
+    </a>
+    <a title="Puestos" class="{% if un in '|puesto_list|puesto_create|puesto_update|puesto_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:puesto_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">badge</span><span class="sidebar-label truncate">Puestos</span>
+    </a>
+
+    <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Sistema</p>
+    <a title="Admin" class="{{ cls_off }}" href="/admin/">
+      <span class="material-symbols-outlined text-[22px] shrink-0">settings</span><span class="sidebar-label truncate">Admin</span>
+    </a>
+  </nav>
+</aside>
+
+<!-- Fondo oscuro del panel en mobile -->
+<div id="sidebarOverlay" class="hidden md:hidden fixed inset-0 top-16 z-30 bg-black/60 backdrop-blur-sm"></div>
 
 {% endwith %}
 {% endwith %}
 {% endwith %}
 
 <!-- ============================ Contenido ============================ -->
-<main class="max-w-[1200px] mx-auto px-container-padding pt-[112px] pb-container-padding min-h-screen flex flex-col gap-stack-lg">
-  {% block content %}{% endblock %}
-</main>
+<div class="contenido">
+  <main class="max-w-[1200px] mx-auto px-stack-md sm:px-container-padding pt-[88px] pb-container-padding min-h-screen flex flex-col gap-stack-lg">
+    {% block content %}{% endblock %}
+  </main>
+</div>
 
 <!-- ==================== Modal de mensajes (auto-open) ==================== -->
 {% if messages %}
 <div id="mensajesModal" data-modal data-modal-autoopen
-     class="hidden fixed inset-0 z-[100] items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+     class="hidden fixed inset-0 z-[110] items-center justify-center bg-black/70 backdrop-blur-sm px-4"
      role="dialog" aria-modal="true" aria-labelledby="mensajesModalTitulo">
   <div class="w-full max-w-lg bg-surface-raised border border-surface-variant rounded-xl p-stack-lg shadow-2xl relative" data-modal-card>
     <button type="button" data-modal-close aria-label="Cerrar"
@@ -352,33 +425,63 @@ prendería TODO el nav.
 </div>
 {% endif %}
 
+<!-- ============ Modal remoto: acá adentro cae cualquier pantalla ============ -->
+<div id="modalRemoto" data-modal role="dialog" aria-modal="true"
+     class="hidden fixed inset-0 z-[100] items-start justify-center bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto">
+  <div class="w-full max-w-3xl my-auto bg-surface-raised border border-surface-variant rounded-xl shadow-2xl relative">
+    <button type="button" data-modal-close aria-label="Cerrar"
+            class="absolute top-stack-md right-stack-md z-10 text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    <div id="modalRemotoCuerpo" class="p-stack-lg"></div>
+  </div>
+</div>
+
 <!-- ============================ Helpers JS ============================ -->
 <script>
 (function () {
   'use strict';
 
   /* ---------------------------------------------------------------------
-     Menú hamburguesa
+     PANEL LATERAL
+     Colapsado en escritorio (solo iconos) / abierto o cerrado en mobile.
+     El estado de escritorio se recuerda; el de mobile no, porque ahí el panel
+     tapa el contenido y dejarlo abierto entre pantallas molesta más que ayuda.
      --------------------------------------------------------------------- */
-  function initNav() {
-    var toggle = document.getElementById('navToggle');
-    var panel = document.getElementById('navMobile');
-    var icono = document.getElementById('navToggleIcon');
-    if (!toggle || !panel) { return; }
+  var raiz = document.documentElement;
 
-    toggle.addEventListener('click', function () {
-      var abierto = panel.classList.toggle('hidden') === false;
-      toggle.setAttribute('aria-expanded', abierto ? 'true' : 'false');
-      toggle.setAttribute('aria-label', abierto ? 'Cerrar menú' : 'Abrir menú');
-      if (icono) { icono.textContent = abierto ? 'close' : 'menu'; }
-    });
+  function esMobile() { return window.matchMedia('(max-width: 767px)').matches; }
+
+  function alternarSidebar() {
+    if (esMobile()) {
+      var abierto = raiz.getAttribute('data-sidebar-mobile') === 'abierto';
+      raiz.setAttribute('data-sidebar-mobile', abierto ? 'cerrado' : 'abierto');
+      var overlay = document.getElementById('sidebarOverlay');
+      if (overlay) { overlay.classList.toggle('hidden', abierto); }
+      return;
+    }
+    var colapsado = raiz.getAttribute('data-sidebar') === 'colapsado';
+    if (colapsado) { raiz.removeAttribute('data-sidebar'); }
+    else { raiz.setAttribute('data-sidebar', 'colapsado'); }
+    try {
+      window.localStorage.setItem('victoria:sidebar', colapsado ? 'abierto' : 'colapsado');
+    } catch (e) { /* sin storage: vale para esta pantalla y listo */ }
+  }
+
+  function cerrarSidebarMobile() {
+    raiz.setAttribute('data-sidebar-mobile', 'cerrado');
+    var overlay = document.getElementById('sidebarOverlay');
+    if (overlay) { overlay.classList.add('hidden'); }
+  }
+
+  function initSidebar() {
+    var toggle = document.getElementById('sidebarToggle');
+    var overlay = document.getElementById('sidebarOverlay');
+    if (toggle) { toggle.addEventListener('click', alternarSidebar); }
+    if (overlay) { overlay.addEventListener('click', cerrarSidebarMobile); }
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !panel.classList.contains('hidden')) {
-        panel.classList.add('hidden');
-        toggle.setAttribute('aria-expanded', 'false');
-        if (icono) { icono.textContent = 'menu'; }
-      }
+      if (e.key === 'Escape') { cerrarSidebarMobile(); }
     });
   }
 
@@ -535,11 +638,116 @@ prendería TODO el nav.
     });
   }
 
+  /* ---------------------------------------------------------------------
+     MODAL REMOTO  ·  todo el CRUD, sin cambiar de pantalla
+
+       <a href="{% templatetag openblock %} url 'stock:producto_update' p.pk {% templatetag closeblock %}" data-modal-link>Editar</a>
+
+     El servidor devuelve el MISMO template de siempre, pero heredando de
+     _base_modal.html en vez de base.html (ver stock/context_processors.py).
+     Si el JS falla o el usuario abre en pestaña nueva, el href sigue siendo
+     una pantalla completa que funciona sola: el modal es una mejora, no un
+     requisito.
+     --------------------------------------------------------------------- */
+  var ESQUELETO =
+    '<div class="cargando flex flex-col gap-stack-md py-stack-lg">' +
+    '  <div class="h-7 w-1/2 bg-surface-overlay rounded"></div>' +
+    '  <div class="h-11 w-full bg-surface-overlay rounded"></div>' +
+    '  <div class="h-11 w-full bg-surface-overlay rounded"></div>' +
+    '  <div class="h-11 w-2/3 bg-surface-overlay rounded"></div>' +
+    '</div>';
+
+  function initModalRemoto() {
+    var modal = document.getElementById('modalRemoto');
+    var cuerpo = document.getElementById('modalRemotoCuerpo');
+    if (!modal || !cuerpo) { return; }
+
+    // La URL de la que salió el fragmento: es el destino por defecto de sus
+    // formularios, porque un form sin action postea a la pantalla de fondo.
+    var urlActual = '';
+
+    function pedir(url, opciones) {
+      opciones = opciones || {};
+      opciones.headers = Object.assign(
+        { 'X-Requested-With': 'XMLHttpRequest' }, opciones.headers || {}
+      );
+      opciones.credentials = 'same-origin';
+      return fetch(url, opciones);
+    }
+
+    function abrir(url) {
+      urlActual = url;
+      cuerpo.innerHTML = ESQUELETO;
+      abrirModal(modal);
+      pedir(url)
+        .then(function (r) {
+          if (!r.ok) { throw new Error(r.status); }
+          return r.text();
+        })
+        .then(function (html) {
+          cuerpo.innerHTML = html;
+          var foco = cuerpo.querySelector('input:not([type=hidden]), select, textarea');
+          if (foco) { foco.focus(); }
+        })
+        .catch(function () {
+          // Si algo se rompe, la pantalla suelta sigue existiendo.
+          window.location.href = url;
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+      var link = e.target.closest ? e.target.closest('[data-modal-link]') : null;
+      if (!link) { return; }
+      // Ctrl/Cmd + click y el botón del medio siguen abriendo en pestaña nueva.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) { return; }
+      var url = link.getAttribute('data-modal-link') || link.getAttribute('href');
+      if (!url || url === '#') { return; }
+      e.preventDefault();
+      abrir(url);
+    });
+
+    // Los formularios del modal se mandan sin recargar. Si el servidor
+    // redirige, guardó bien: seguimos el redirect. Si devuelve HTML, son
+    // errores de validación y se repinta el modal con ellos.
+    modal.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (form.tagName !== 'FORM') { return; }
+      e.preventDefault();
+
+      var boton = form.querySelector('[type=submit]');
+      if (boton) { boton.disabled = true; }
+
+      pedir(form.getAttribute('action') || urlActual, {
+        method: (form.getAttribute('method') || 'POST').toUpperCase(),
+        body: new FormData(form),
+      })
+        .then(function (r) {
+          if (r.redirected) {
+            // El fragmento del modal no imprime los mensajes de Django, así que
+            // siguen en la sesión y los muestra la pantalla a la que vamos.
+            window.location.href = r.url;
+            return null;
+          }
+          return r.text();
+        })
+        .then(function (html) {
+          if (html === null) { return; }
+          cuerpo.innerHTML = html;
+          if (boton) { boton.disabled = false; }
+        })
+        .catch(function () {
+          if (boton) { boton.disabled = false; }
+          form.submit();   // último recurso: posteo normal, con recarga
+        });
+    });
+  }
+
   /* --------------------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
-    initNav();
+    initSidebar();
     initTabs();
     initModales();
+    initModalRemoto();
   });
 
   // API pública por si alguna pantalla la necesita

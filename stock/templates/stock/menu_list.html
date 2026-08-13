@@ -1,14 +1,14 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <!-- ============================ Header ============================ -->
 <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
   <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Menús</h1>
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
-    <button type="button" data-modal-open="#modalMenu"
+    <a data-modal-link href="{% url 'stock:menu_create' %}"
             class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
       <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo menú</span>
-    </button>
+    </a>
   </div>
 </header>
 
@@ -29,15 +29,15 @@
           <td class="px-stack-md py-4">
             <div class="flex items-center gap-stack-sm">
               <span class="w-8 h-8 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-label-md text-label-md uppercase">{% with palabras=menu.nombre.split %}{{ palabras.0|first|upper }}{% if palabras.1 %}{{ palabras.1|first|upper }}{% endif %}{% endwith %}</span>
-              <a href="{% url 'stock:menu_detail' menu.pk %}"
+              <a data-modal-link href="{% url 'stock:menu_detail' menu.pk %}"
                  class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ menu.nombre }}</a>
             </div>
           </td>
           <td class="px-stack-md py-4 text-on-surface-med">{{ menu.descripcion|truncatechars:60|default:"—" }}</td>
           <td class="px-stack-md py-4 text-right whitespace-nowrap">
-            <a href="{% url 'stock:menu_detail' menu.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
-            <a href="{% url 'stock:menu_update' menu.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
-            <a href="{% url 'stock:menu_delete' menu.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            <a data-modal-link href="{% url 'stock:menu_detail' menu.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+            <a data-modal-link href="{% url 'stock:menu_update' menu.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:menu_delete' menu.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
           </td>
         </tr>
         {% empty %}
@@ -57,38 +57,4 @@
 </div>
 
 <!-- ======================= Modal · Nuevo menú ======================= -->
-<div id="modalMenu" data-modal role="dialog" aria-modal="true" aria-labelledby="modalMenuTitulo"
-     class="hidden fixed inset-0 z-[100] items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto">
-  <div class="w-full max-w-2xl bg-surface-raised border border-surface-variant rounded-xl p-stack-lg shadow-2xl relative">
-    <button type="button" data-modal-close aria-label="Cerrar" class="absolute top-stack-md right-stack-md text-on-surface-variant hover:text-primary transition-colors">
-      <span class="material-symbols-outlined">close</span>
-    </button>
-
-    <div class="mb-stack-lg pr-stack-lg">
-      <h2 id="modalMenuTitulo" class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high tracking-tight">Nuevo menú</h2>
-      <p class="font-body-md text-body-md text-on-surface-variant mt-unit">Cargá los datos del menú.</p>
-    </div>
-
-    <form method="post" action="{% url 'stock:menu_create' %}" class="flex flex-col gap-stack-lg">
-      {% csrf_token %}
-
-      <div class="grid grid-cols-1 gap-gutter">
-        <div class="flex flex-col gap-unit">
-          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="menu_nombre">Nombre</label>
-          <input type="text" name="nombre" id="menu_nombre" required class="w-full font-body-md text-body-md">
-        </div>
-        <div class="flex flex-col gap-unit">
-          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="menu_descripcion">Descripción</label>
-          <textarea name="descripcion" id="menu_descripcion" rows="3" class="w-full font-body-md text-body-md min-h-[120px] resize-y"></textarea>
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-        <button type="button" data-modal-close class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</button>
-        <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
-      </div>
-    </form>
-  </div>
-</div>
-
 {% endblock %}

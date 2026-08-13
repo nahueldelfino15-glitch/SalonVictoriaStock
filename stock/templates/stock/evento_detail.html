@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 {% with movs=evento.movimientos.all pers=evento.personal.all gs=evento.gasto_stock gp=evento.gasto_personal %}
 
@@ -25,11 +25,11 @@
         </button>
       </form>
       {% endif %}
-      <a href="{% url 'stock:evento_update' evento.pk %}"
+      <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}"
          class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
         <span class="material-symbols-outlined text-[18px]">edit</span><span>Editar evento</span>
       </a>
-      <a href="{% url 'stock:evento_delete' evento.pk %}"
+      <a data-modal-link href="{% url 'stock:evento_delete' evento.pk %}"
          class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
         <span class="material-symbols-outlined text-[18px]">delete</span><span>Eliminar</span>
       </a>
@@ -103,6 +103,64 @@
   {% endif %}
 </section>
 
+<!-- ===================== Receta del evento (RN-18 / RN-19) ===================== -->
+{% if evento.menu %}
+<section class="flex flex-col gap-stack-md">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
+    <div>
+      <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Receta del evento</h2>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+        Heredada de <a data-modal-link href="{% url 'stock:menu_detail' evento.menu.pk %}" class="text-primary hover:underline">{{ evento.menu.nombre }}</a>
+        y calculada para {{ evento.asistentes|default:0 }} persona{{ evento.asistentes|default:0|pluralize }}.
+        Es una estimación: <strong class="text-on-surface">no descuenta stock</strong>.
+      </p>
+    </div>
+    {% if not evento.cerrado %}
+    <form method="post" action="{% url 'stock:evento_copiar_receta' evento.pk %}">
+      {% csrf_token %}
+      <button type="submit"
+              class="w-full inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+        <span class="material-symbols-outlined text-[18px]">refresh</span><span>Volver a traer del menú</span>
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    {% for grupo in evento.receta_calculada %}
+    {% if grupo.platos %}
+    <div class="border-b border-surface-overlay last:border-b-0">
+      <p class="px-stack-lg py-stack-sm bg-surface-container font-label-md text-label-md text-primary uppercase tracking-wider">{{ grupo.etiqueta }}</p>
+
+      {% for plato in grupo.platos %}
+      <div class="px-stack-lg py-stack-md border-t border-surface-overlay">
+        <p class="font-body-md text-body-md text-on-surface-high">{{ plato.nombre }}</p>
+        <ul class="mt-stack-sm flex flex-col gap-unit">
+          {% for item in plato.ingredientes %}
+          <li class="flex flex-wrap justify-between gap-stack-sm font-body-sm text-body-sm">
+            <span class="text-on-surface-med">{{ item.producto.nombre }} <span class="text-on-surface-med/70">({{ item.por_persona }} {{ item.producto.unidad_medida }} por persona)</span></span>
+            <span class="text-primary font-semibold">{{ item.cantidad }} {{ item.producto.unidad_medida }}</span>
+          </li>
+          {% empty %}
+          <li class="font-body-sm text-body-sm text-on-surface-med italic">Sin ingredientes cargados.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% empty %}
+    <p class="px-stack-lg py-16 text-center font-body-md text-body-md text-on-surface-med">Este menú todavía no tiene platos cargados.</p>
+    {% endfor %}
+
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex flex-wrap justify-between gap-stack-sm items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>Cantidades estimadas para {{ evento.asistentes|default:0 }} persona{{ evento.asistentes|default:0|pluralize }}</span>
+      <span>Costo estimado: <span class="text-primary font-semibold">$ {{ evento.costo_receta_estimado|floatformat:2 }}</span></span>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <!-- ===================== Consumo de stock ===================== -->
 <section class="flex flex-col gap-stack-md">
   <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Consumo de Stock</h2>
@@ -127,8 +185,8 @@
             <td class="px-stack-md py-4 text-right">{{ m.cantidad }} {{ m.producto.unidad_medida }}</td>
             <td class="px-stack-md py-4 text-right">$ {{ m.producto.precio_unitario|floatformat:2 }}</td>
             <td class="px-stack-md py-4 text-right whitespace-nowrap">
-              <a href="{% url 'stock:movimientostock_update' m.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
-              <a href="{% url 'stock:movimientostock_delete' m.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+              <a data-modal-link href="{% url 'stock:movimientostock_update' m.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a data-modal-link href="{% url 'stock:movimientostock_delete' m.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
             </td>
           </tr>
           {% empty %}
@@ -173,8 +231,8 @@
             <td class="px-stack-md py-4 text-right">{{ p.horas_trabajadas|floatformat:"-2" }} h</td>
             <td class="px-stack-md py-4 text-right">$ {{ p.pago|floatformat:2 }}</td>
             <td class="px-stack-md py-4 text-right whitespace-nowrap">
-              <a href="{% url 'stock:personalevento_update' p.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
-              <a href="{% url 'stock:personalevento_delete' p.pk %}" aria-label="Quitar" title="Quitar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+              <a data-modal-link href="{% url 'stock:personalevento_update' p.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a data-modal-link href="{% url 'stock:personalevento_delete' p.pk %}" aria-label="Quitar" title="Quitar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
             </td>
           </tr>
           {% empty %}
@@ -220,7 +278,7 @@
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
     <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Cargos al cliente</h2>
     {% if not evento.cerrado %}
-    <a href="{% url 'stock:cargoevento_create' evento.pk %}"
+    <a data-modal-link href="{% url 'stock:cargoevento_create' evento.pk %}"
        class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar cargo</span>
     </a>
@@ -243,8 +301,8 @@
             <td class="px-stack-md py-4 text-on-surface-high">{{ c.concepto }}</td>
             <td class="px-stack-md py-4 text-on-surface-med">$ {{ c.monto|floatformat:2 }}</td>
             <td class="px-stack-md py-4 text-right whitespace-nowrap">
-              <a href="{% url 'stock:cargoevento_update' c.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
-              <a href="{% url 'stock:cargoevento_delete' c.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+              <a data-modal-link href="{% url 'stock:cargoevento_update' c.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a data-modal-link href="{% url 'stock:cargoevento_delete' c.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
             </td>
           </tr>
           {% empty %}
@@ -301,7 +359,7 @@
   <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">payments</span>
   <div>
     <p class="font-body-md text-body-md text-on-surface">Este evento no tiene precio cargado, así que no se puede calcular la ganancia.</p>
-    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Cargá el precio por persona o el precio cerrado desde <a href="{% url 'stock:evento_update' evento.pk %}" class="text-primary hover:underline">editar evento</a>.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Cargá el precio por persona o el precio cerrado desde <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" class="text-primary hover:underline">editar evento</a>.</p>
   </div>
 </div>
 {% endif %}

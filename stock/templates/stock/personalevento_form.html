@@ -1,10 +1,10 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
 
   <div class="mb-stack-lg">
-    <a href="{% url 'stock:evento_detail' evento.pk %}"
+    <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}"
        class="inline-flex items-center gap-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med hover:text-primary transition-colors mb-stack-md">
       <span class="material-symbols-outlined text-[16px]">arrow_back</span>
       <span>Volver al evento</span>
@@ -45,7 +45,7 @@
     </div>
 
     <div class="flex flex-col-reverse sm:flex-row justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-      <a href="{% url 'stock:evento_detail' evento.pk %}"
+      <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:evento_detail' evento.pk %}"
          class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
         Cancelar
       </a>

@@ -5,23 +5,25 @@
 
   <span class="material-symbols-outlined text-error text-[40px]">warning</span>
 
-  <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">¿Querés eliminar este {% if object.evento %}consumo{% else %}movimiento{% endif %}?</h1>
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">¿Eliminar este plato?</h1>
 
   <p class="font-body-md text-body-md text-on-surface-med mt-stack-sm">
-    Vas a borrar <strong class="text-on-surface-high">{{ object.get_tipo_display }} x{{ object.cantidad }}</strong>
-    de <strong class="text-on-surface-high">{{ object.producto.nombre }}</strong>{% if object.evento %} en <strong class="text-on-surface-high">{{ object.evento.nombre }}</strong>{% else %} (carga de depósito, sin evento){% endif %}.
+    Se borra <strong class="text-on-surface-high">{{ object.nombre }}</strong>
+    ({{ object.get_paso_display|lower }})
+    {% if object.menu %}del menú <strong class="text-on-surface-high">{{ object.menu.nombre }}</strong>{% else %}de la receta de <strong class="text-on-surface-high">{{ object.evento.nombre }}</strong>{% endif %}
+    con sus {{ object.lineas.all|length }} ingrediente{{ object.lineas.all|length|pluralize }}.
   </p>
 
   <div class="mt-stack-md rounded-lg border border-surface-overlay bg-surface-base px-stack-md py-stack-sm text-left">
     <p class="font-body-sm text-body-sm text-on-surface-med flex items-start gap-stack-sm">
       <span class="material-symbols-outlined text-primary text-[18px] shrink-0">info</span>
-      <span>El stock del producto se va a recalcular automáticamente.</span>
+      <span>No toca el stock ni el consumo ya cargado: la receta es solo un cálculo.</span>
     </p>
   </div>
 
   <form method="post" class="flex flex-col-reverse sm:flex-row justify-center gap-stack-md mt-stack-lg pt-stack-md border-t border-surface-variant">
     {% csrf_token %}
-    <a {% if es_modal %}data-modal-close{% endif %} href="{% if object.evento %}{% url 'stock:evento_detail' object.evento.pk %}{% else %}{% url 'stock:compras' %}{% endif %}"
+    <a {% if es_modal %}data-modal-close{% endif %} href="{% if object.menu %}{% url 'stock:menu_detail' object.menu.pk %}{% else %}{% url 'stock:evento_detail' object.evento.pk %}{% endif %}"
        class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       Cancelar
     </a>

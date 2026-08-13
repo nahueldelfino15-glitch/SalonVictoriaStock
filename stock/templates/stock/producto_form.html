@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
@@ -44,7 +44,7 @@
     {% endif %}
 
     <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-      <a href="{% url 'stock:producto_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+      <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:producto_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
       <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
     </div>
   </form>

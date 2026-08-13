@@ -34,9 +34,14 @@ urlpatterns = [
     path('cargos/<int:pk>/editar/', views.CargoEventoUpdateView.as_view(), name='cargoevento_update'),
     path('cargos/<int:pk>/eliminar/', views.CargoEventoDeleteView.as_view(), name='cargoevento_delete'),
 
-    path('menus/<int:menu_pk>/receta/nueva/', views.LineaRecetaCreateView.as_view(), name='lineareceta_create_menu'),
-    path('eventos/<int:evento_pk>/receta/nueva/', views.LineaRecetaCreateView.as_view(), name='lineareceta_create_evento'),
-    path('receta/<int:pk>/eliminar/', views.LineaRecetaDeleteView.as_view(), name='lineareceta_delete'),
+    path('menus/<int:menu_pk>/platos/nuevo/', views.PlatoCreateView.as_view(), name='plato_create'),
+    path('platos/<int:pk>/', views.PlatoDetailView.as_view(), name='plato_detail'),
+    path('platos/<int:pk>/editar/', views.PlatoUpdateView.as_view(), name='plato_update'),
+    path('platos/<int:pk>/eliminar/', views.PlatoDeleteView.as_view(), name='plato_delete'),
+
+    path('platos/<int:plato_pk>/ingredientes/nuevo/', views.LineaRecetaCreateView.as_view(), name='lineareceta_create'),
+    path('ingredientes/<int:pk>/editar/', views.LineaRecetaUpdateView.as_view(), name='lineareceta_update'),
+    path('ingredientes/<int:pk>/eliminar/', views.LineaRecetaDeleteView.as_view(), name='lineareceta_delete'),
     path('eventos/<int:pk>/receta/copiar/', views.copiar_receta, name='evento_copiar_receta'),
 
     path('empleados/', views.EmpleadoListView.as_view(), name='empleado_list'),
@@ -44,6 +49,11 @@ urlpatterns = [
     path('empleados/nuevo/', views.EmpleadoCreateView.as_view(), name='empleado_create'),
     path('empleados/<int:pk>/editar/', views.EmpleadoUpdateView.as_view(), name='empleado_update'),
     path('empleados/<int:pk>/eliminar/', views.EmpleadoDeleteView.as_view(), name='empleado_delete'),
+
+    path('puestos/', views.PuestoListView.as_view(), name='puesto_list'),
+    path('puestos/nuevo/', views.PuestoCreateView.as_view(), name='puesto_create'),
+    path('puestos/<int:pk>/editar/', views.PuestoUpdateView.as_view(), name='puesto_update'),
+    path('puestos/<int:pk>/eliminar/', views.PuestoDeleteView.as_view(), name='puesto_delete'),
 
     path('eventos/<int:evento_pk>/personal/nuevo/', views.PersonalEventoCreateView.as_view(), name='personalevento_create'),
     path('personal-evento/<int:pk>/editar/', views.PersonalEventoUpdateView.as_view(), name='personalevento_update'),

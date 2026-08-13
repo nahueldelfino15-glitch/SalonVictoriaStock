@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
@@ -18,7 +18,7 @@
       <span class="material-symbols-outlined text-[18px]">history</span><span>Historial</span>
     </a>
 
-    <a href="{% url 'stock:evento_create' %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+    <a data-modal-link href="{% url 'stock:evento_create' %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
       <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo evento</span>
     </a>
   </div>
@@ -56,9 +56,9 @@
             {% endif %}
           </td>
           <td class="px-stack-md py-4 text-right whitespace-nowrap">
-            <a href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
-            <a href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
-            <a href="{% url 'stock:evento_delete' evento.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+            <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:evento_delete' evento.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
           </td>
         </tr>
         {% empty %}

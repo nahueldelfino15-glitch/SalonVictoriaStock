@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <!-- ============================ Encabezado ============================ -->
@@ -73,7 +73,7 @@
 
     <div class="divide-y divide-surface-overlay">
       {% for evento in proximos %}
-      <a href="{% url 'stock:evento_detail' evento.pk %}"
+      <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}"
          class="px-stack-lg py-stack-md hover:bg-[#1C1C1C] transition-colors flex items-center justify-between gap-stack-md group">
         <div class="flex items-center gap-stack-md min-w-0">
           <div class="bg-surface-overlay rounded-lg p-2 text-center min-w-[60px] shrink-0">
@@ -159,7 +159,7 @@
     </div>
 
     <div class="px-stack-lg py-stack-md border-t border-surface-overlay bg-surface-container">
-      <a href="{% url 'stock:evento_create' %}"
+      <a data-modal-link href="{% url 'stock:evento_create' %}"
          class="w-full inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
         <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo evento</span>
       </a>

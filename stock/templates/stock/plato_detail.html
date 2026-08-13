@@ -1,0 +1,78 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<!-- ============================ Header ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div class="min-w-0">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">{{ plato.get_paso_display }}</p>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-unit">{{ plato.nombre }}</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      {% if plato.menu %}Del menú {{ plato.menu.nombre }}{% else %}De la receta de {{ plato.evento.nombre }}{% endif %}
+    </p>
+  </div>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <a {% if es_modal %}data-modal-close{% endif %} href="{% if plato.menu %}{% url 'stock:menu_detail' plato.menu.pk %}{% else %}{% url 'stock:evento_detail' plato.evento.pk %}{% endif %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">arrow_back</span><span>Volver</span>
+    </a>
+    <a data-modal-link href="{% url 'stock:lineareceta_create' plato.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar ingrediente</span>
+    </a>
+  </div>
+</header>
+
+<!-- ============================ Ingredientes ============================ -->
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Ingrediente</th>
+          <th class="px-stack-md py-4 font-semibold">Por persona</th>
+          <th class="px-stack-md py-4 font-semibold">Costo por persona</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for linea in plato.lineas.all %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors">
+          <td class="px-stack-md py-4 text-on-surface-high">{{ linea.producto.nombre }}</td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ linea.cantidad_por_persona }} {{ linea.producto.unidad_medida }}</td>
+          <td class="px-stack-md py-4 text-on-surface-med">$ {{ linea.costo_por_persona|floatformat:2 }}</td>
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a data-modal-link href="{% url 'stock:lineareceta_update' linea.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:lineareceta_delete' linea.pk %}" aria-label="Sacar" title="Sacar del plato" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">restaurant</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Este plato todavía no tiene ingredientes.</p>
+            <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Cargá cuánto lleva de cada producto <strong>por persona</strong>: 0,200 kg de carne, 0,125 L de vino.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ plato.lineas.all|length }} ingrediente{{ plato.lineas.all|length|pluralize }}</span>
+    <span>Costo del plato: <span class="text-primary font-semibold">$ {{ plato.costo_por_persona|floatformat:2 }}</span> por persona</span>
+  </div>
+</div>
+
+<!-- ============================ Peligro ============================ -->
+<div class="flex justify-end gap-stack-md">
+  <a data-modal-link href="{% url 'stock:plato_update' plato.pk %}"
+     class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">edit</span><span>Editar plato</span>
+  </a>
+  <a data-modal-link href="{% url 'stock:plato_delete' plato.pk %}"
+     class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">delete</span><span>Eliminar plato</span>
+  </a>
+</div>
+
+{% endblock %}

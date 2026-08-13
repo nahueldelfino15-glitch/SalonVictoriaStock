@@ -86,6 +86,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # Decide si el template se sirve entero o como fragmento de modal.
+                'stock.context_processors.modal',
             ],
         },
     },

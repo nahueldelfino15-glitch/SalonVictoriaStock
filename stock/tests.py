@@ -23,8 +23,22 @@ from .models import (
     Menu,
     MovimientoStock,
     PersonalEvento,
+    Plato,
     Producto,
+    Puesto,
 )
+
+
+def un_puesto(nombre='Mozo'):
+    """El puesto ya no es texto libre: es una fila del catalogo (Puesto)."""
+    return Puesto.objects.get_or_create(nombre=nombre)[0]
+
+
+def una_receta(dueno, producto, cantidad, paso='principal', nombre='Plato'):
+    """Un plato de un solo ingrediente, que es lo que la mayoria de los tests necesita."""
+    plato = Plato.objects.create(paso=paso, nombre=nombre, **dueno)
+    LineaReceta.objects.create(plato=plato, producto=producto, cantidad_por_persona=cantidad)
+    return plato
 
 
 class ClienteLogueadoTests(TestCase):
@@ -141,7 +155,7 @@ class GastoEventoTests(TestCase):
 
     def test_gasto_personal_suma_los_pagos(self):
         PersonalEvento.objects.create(
-            evento=self.evento, empleado=self.empleado, puesto='Mozo', pago=50000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=50000
         )
         self.assertEqual(self.evento.gasto_personal, 50000)
 
@@ -156,7 +170,7 @@ class GastoEventoTests(TestCase):
             producto=self.producto, evento=self.evento, tipo='salida', cantidad=2
         )
         PersonalEvento.objects.create(
-            evento=self.evento, empleado=self.empleado, puesto='Mozo', pago=50000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=50000
         )
         self.assertEqual(self.evento.gasto_total, 52000)
 
@@ -365,7 +379,7 @@ class RentabilidadTests(TestCase):
             producto=self.producto, evento=self.evento, tipo='salida', cantidad=100
         )
         PersonalEvento.objects.create(
-            evento=self.evento, empleado=self.empleado, puesto='Moza', pago=150000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Moza'), pago=150000
         )
 
         self.assertEqual(self.evento.ingreso_total, 550000)
@@ -376,7 +390,7 @@ class RentabilidadTests(TestCase):
         self.evento.precio_cerrado = 100000
         self.evento.save()
         PersonalEvento.objects.create(
-            evento=self.evento, empleado=self.empleado, puesto='Mozo', pago=150000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=150000
         )
         self.assertEqual(self.evento.margen, -50000)
 
@@ -384,7 +398,7 @@ class RentabilidadTests(TestCase):
         self.evento.precio_cerrado = 200000
         self.evento.save()
         PersonalEvento.objects.create(
-            evento=self.evento, empleado=self.empleado, puesto='Mozo', pago=50000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=50000
         )
         self.assertEqual(self.evento.margen_porcentaje, 75)
 
@@ -410,7 +424,11 @@ class RentabilidadTests(TestCase):
 
 
 class RecetaTests(TestCase):
-    """RN-18 y RN-19: la receta costea y sugiere, pero no descuenta sola."""
+    """RN-18 y RN-19: la receta se carga en el menu, costea y sugiere.
+
+    La receta vive organizada por platos (entrante, principal, postre...) y cada
+    plato lleva sus ingredientes medidos por persona.
+    """
 
     def setUp(self):
         self.carne = Producto.objects.create(
@@ -422,11 +440,13 @@ class RecetaTests(TestCase):
             stock_actual=500, unidad_medida='botella'
         )
         self.menu = Menu.objects.create(nombre='Clásico')
-        LineaReceta.objects.create(
-            menu=self.menu, producto=self.carne, cantidad_por_persona=Decimal('0.250')
+        self.principal = una_receta(
+            {'menu': self.menu}, self.carne, Decimal('0.250'),
+            paso='principal', nombre='Bife con papas',
         )
-        LineaReceta.objects.create(
-            menu=self.menu, producto=self.vino, cantidad_por_persona=Decimal('0.500')
+        una_receta(
+            {'menu': self.menu}, self.vino, Decimal('0.500'),
+            paso='entrante', nombre='Brindis',
         )
         self.evento = Evento.objects.create(
             nombre='Boda', fecha=date(2026, 11, 1), asistentes=100, menu=self.menu
@@ -436,36 +456,73 @@ class RecetaTests(TestCase):
         # 0,250 kg × $8.000 = $2.000  +  0,5 botella × $3.000 = $1.500
         self.assertEqual(self.menu.costo_por_persona, Decimal('3500.000'))
 
+    def test_los_platos_se_agrupan_en_orden_de_servicio(self):
+        """El entrante va antes que el principal, aunque alfabeticamente no."""
+        grupos = self.menu.platos_por_paso
+        self.assertEqual([g['clave'] for g in grupos],
+                         ['entrante', 'principal', 'secundario', 'postre'])
+        self.assertEqual(grupos[0]['platos'][0].nombre, 'Brindis')
+        self.assertEqual(grupos[1]['platos'][0].nombre, 'Bife con papas')
+
+    def test_asignar_el_menu_le_trae_la_receta_al_evento_solo(self):
+        """No hay que copiar nada a mano: el evento hereda al quedar asignado."""
+        self.assertEqual(self.evento.platos.count(), 2)
+
     def test_copiar_la_receta_del_menu_al_evento(self):
         self.assertEqual(self.evento.copiar_receta_del_menu(), 2)
-        self.assertEqual(self.evento.receta.count(), 2)
+        self.assertEqual(self.evento.platos.count(), 2)
 
     def test_cambiar_el_menu_base_no_altera_la_receta_ya_copiada(self):
         """RN-18: el menú evoluciona, lo ya cargado no."""
-        self.evento.copiar_receta_del_menu()
-
-        linea = self.menu.lineas.get(producto=self.carne)
+        linea = self.principal.lineas.get(producto=self.carne)
         linea.cantidad_por_persona = Decimal('0.400')
         linea.save()
 
-        copia = self.evento.receta.get(producto=self.carne)
+        copia = LineaReceta.objects.get(plato__evento=self.evento, producto=self.carne)
         self.assertEqual(copia.cantidad_por_persona, Decimal('0.250'), 'la copia es independiente')
 
     def test_copiar_de_nuevo_reemplaza_no_duplica(self):
         self.evento.copiar_receta_del_menu()
         self.evento.copiar_receta_del_menu()
-        self.assertEqual(self.evento.receta.count(), 2)
+        self.assertEqual(self.evento.platos.count(), 2)
+
+    def test_guardar_el_evento_sin_cambiar_el_menu_no_recopia(self):
+        """Corregir el telefono no puede pisar la receta que ya estaba."""
+        self.evento.platos.filter(paso='entrante').delete()
+        self.evento.telefono_contacto = '351-1234'
+        self.evento.save()
+        self.assertEqual(self.evento.platos.count(), 1, 'la receta se quedó como estaba')
+
+    def test_cambiar_de_menu_si_recopia(self):
+        otro = Menu.objects.create(nombre='Vegetariano')
+        una_receta({'menu': otro}, self.vino, Decimal('0.100'), nombre='Ensalada')
+
+        self.evento.menu = otro
+        self.evento.save()
+
+        self.assertEqual(self.evento.platos.count(), 1)
+        self.assertEqual(self.evento.platos.first().nombre, 'Ensalada')
 
     def test_el_consumo_sugerido_multiplica_por_los_asistentes(self):
-        self.evento.copiar_receta_del_menu()
         sugerido = {item['producto'].nombre: item['cantidad'] for item in self.evento.consumo_sugerido}
 
         self.assertEqual(sugerido['Carne'], Decimal('25.00'))
         self.assertEqual(sugerido['Vino'], Decimal('50.00'))
 
+    def test_un_producto_en_dos_platos_se_suma_una_sola_vez(self):
+        """La papa va en el principal y en la guarnicion: es UN pedido de papa."""
+        una_receta(
+            {'menu': self.menu}, self.carne, Decimal('0.100'),
+            paso='secundario', nombre='Empanadas',
+        )
+        self.evento.copiar_receta_del_menu()
+
+        sugerido = [i for i in self.evento.consumo_sugerido if i['producto'] == self.carne]
+        self.assertEqual(len(sugerido), 1, 'un producto, una linea de consumo')
+        self.assertEqual(sugerido[0]['cantidad'], Decimal('35.00'), '(0,250 + 0,100) × 100')
+
     def test_la_receta_no_descuenta_stock_por_su_cuenta(self):
         """RN-19: el corazón de la decisión 8 del dueño."""
-        self.evento.copiar_receta_del_menu()
         _ = self.evento.consumo_sugerido
 
         self.carne.refresh_from_db()
@@ -478,18 +535,14 @@ class RecetaTests(TestCase):
         suelto = Evento.objects.create(nombre='Suelto', fecha=date(2026, 12, 1), asistentes=50)
         self.assertEqual(suelto.copiar_receta_del_menu(), 0)
 
-    def test_una_linea_no_puede_ser_de_un_menu_y_de_un_evento_a_la_vez(self):
-        linea = LineaReceta(
-            menu=self.menu, evento=self.evento, producto=self.carne,
-            cantidad_por_persona=Decimal('0.100'),
-        )
+    def test_un_plato_no_puede_ser_de_un_menu_y_de_un_evento_a_la_vez(self):
+        plato = Plato(menu=self.menu, evento=self.evento, paso='postre', nombre='Helado')
         with self.assertRaises(Exception):
-            linea.save()
+            plato.save()
 
-    def test_una_linea_tiene_que_tener_algun_dueno(self):
-        linea = LineaReceta(producto=self.carne, cantidad_por_persona=Decimal('0.100'))
+    def test_un_plato_tiene_que_tener_algun_dueno(self):
         with self.assertRaises(Exception):
-            linea.save()
+            Plato(paso='postre', nombre='Helado').save()
 
     def test_no_se_puede_borrar_un_producto_que_esta_en_una_receta(self):
         from django.db.models import ProtectedError
@@ -518,7 +571,7 @@ class EventoCerradoTests(TestCase):
 
     def test_no_se_puede_cargar_personal_a_un_evento_cerrado(self):
         asignacion = PersonalEvento(
-            evento=self.evento, empleado=self.empleado, puesto='Mozo', pago=1000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=1000
         )
         with self.assertRaises(ValidationError):
             asignacion.full_clean()
@@ -595,6 +648,145 @@ class BajaDeProductoTests(ClienteLogueadoTests):
         self.client.post(reverse('stock:producto_reactivar', kwargs={'pk': self.producto.pk}))
         self.producto.refresh_from_db()
         self.assertTrue(self.producto.activo)
+
+
+class ListadoDeProductosTests(ClienteLogueadoTests):
+    """Un sector por pestana, y los dados de baja fuera de la lista (RN-20)."""
+
+    def setUp(self):
+        super().setUp()
+        self.activo = Producto.objects.create(nombre='Fernet', sector='barra', stock_actual=10)
+        self.baja = Producto.objects.create(nombre='Gancia', sector='barra', stock_actual=0)
+        self.baja.dar_de_baja()
+        self.cocina = Producto.objects.create(nombre='Carne', sector='cocina', stock_actual=5)
+
+    def test_cada_sector_va_en_su_propia_lista(self):
+        contexto = self.client.get(reverse('stock:producto_list')).context
+        self.assertIn(self.activo, contexto['productos_barra'])
+        self.assertIn(self.cocina, contexto['productos_cocina'])
+        self.assertNotIn(self.cocina, contexto['productos_barra'])
+        self.assertEqual(list(contexto['productos_extras']), [])
+
+    def test_los_dados_de_baja_no_se_listan(self):
+        contexto = self.client.get(reverse('stock:producto_list')).context
+        self.assertNotIn(self.baja, contexto['productos_barra'])
+        self.assertEqual(contexto['cantidad_bajas'], 1, 'pero el sistema sabe que estan')
+
+    def test_se_pueden_ver_aparte_para_reactivarlos(self):
+        contexto = self.client.get(reverse('stock:producto_list'), {'bajas': '1'}).context
+        self.assertIn(self.baja, contexto['productos_barra'])
+        self.assertNotIn(self.activo, contexto['productos_barra'])
+
+    def test_la_busqueda_sigue_filtrando_por_nombre(self):
+        contexto = self.client.get(reverse('stock:producto_list'), {'q': 'fern'}).context
+        self.assertIn(self.activo, contexto['productos_barra'])
+        self.assertEqual(list(contexto['productos_cocina']), [])
+
+
+class PuestoTests(ClienteLogueadoTests):
+    """El catalogo de puestos lo administra el salon, no el codigo."""
+
+    def setUp(self):
+        super().setUp()
+        self.puesto = Puesto.objects.create(nombre='Valet')
+        self.empleado = Empleado.objects.create(nombre='Tito')
+        self.evento = Evento.objects.create(nombre='Casamiento', fecha=date(2026, 5, 1))
+
+    def test_se_puede_cargar_un_puesto_nuevo(self):
+        self.client.post(reverse('stock:puesto_create'), {'nombre': 'Fotógrafo'})
+        self.assertTrue(Puesto.objects.filter(nombre='Fotógrafo').exists())
+
+    def test_un_puesto_sin_uso_se_borra(self):
+        self.client.post(reverse('stock:puesto_delete', kwargs={'pk': self.puesto.pk}))
+        self.assertFalse(Puesto.objects.filter(pk=self.puesto.pk).exists())
+
+    def test_un_puesto_usado_en_un_evento_no_se_borra(self):
+        """Es historial de pagos: borrarlo dejaria sin etiqueta lo ya liquidado."""
+        PersonalEvento.objects.create(
+            evento=self.evento, empleado=self.empleado, puesto=self.puesto, pago=1000
+        )
+        respuesta = self.client.post(reverse('stock:puesto_delete', kwargs={'pk': self.puesto.pk}))
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(Puesto.objects.filter(pk=self.puesto.pk).exists())
+
+    def test_los_puestos_llegan_a_la_pantalla_de_consumo(self):
+        contexto = self.client.get(
+            reverse('stock:consumo_evento', kwargs={'evento_pk': self.evento.pk})
+        ).context
+        self.assertIn(self.puesto, contexto['puestos'])
+
+    def test_se_asigna_personal_eligiendo_un_puesto_de_la_lista(self):
+        self.client.post(
+            reverse('stock:personalevento_create', kwargs={'evento_pk': self.evento.pk}),
+            {'empleado': self.empleado.pk, 'puesto': self.puesto.pk,
+             'horas_trabajadas': '8', 'pago': '50000'},
+        )
+        asignacion = PersonalEvento.objects.get(evento=self.evento)
+        self.assertEqual(asignacion.puesto, self.puesto)
+
+
+class ModalTests(ClienteLogueadoTests):
+    """Todo el CRUD se abre en un modal, con el MISMO template de la pantalla."""
+
+    CABECERA = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
+
+    def setUp(self):
+        super().setUp()
+        self.producto = Producto.objects.create(nombre='Fernet', sector='barra', stock_actual=10)
+
+    def test_por_fetch_devuelve_solo_el_fragmento(self):
+        respuesta = self.client.get(
+            reverse('stock:producto_update', kwargs={'pk': self.producto.pk}), **self.CABECERA
+        )
+        cuerpo = respuesta.content.decode()
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotIn('<html', cuerpo, 'el fragmento no puede traer la pagina entera')
+        self.assertNotIn('id="sidebar"', cuerpo)
+        self.assertIn('name="nombre"', cuerpo, 'pero si el formulario')
+
+    def test_sin_fetch_devuelve_la_pantalla_completa(self):
+        """El modal es una mejora: la URL suelta tiene que seguir funcionando."""
+        cuerpo = self.client.get(
+            reverse('stock:producto_update', kwargs={'pk': self.producto.pk})
+        ).content.decode()
+
+        self.assertIn('<html', cuerpo)
+        self.assertIn('id="sidebar"', cuerpo)
+
+    def test_el_fragmento_no_se_come_los_mensajes(self):
+        """Los mensajes los tiene que mostrar la pantalla a la que se redirige.
+
+        Si el fragmento los imprimiera quedarian consumidos y el usuario no se
+        enteraria de que su producto se dio de baja en vez de borrarse.
+        """
+        MovimientoStock.objects.create(producto=self.producto, tipo='entrada', cantidad=5)
+        self.client.post(reverse('stock:producto_delete', kwargs={'pk': self.producto.pk}))
+
+        destino = self.client.get(reverse('stock:producto_list'), **self.CABECERA)
+        self.assertTrue(destino.context['messages'], 'el aviso sigue disponible')
+
+    def test_guardar_desde_el_modal_redirige(self):
+        """El JS distingue 'guardo' de 'hay errores' por el redirect."""
+        respuesta = self.client.post(
+            reverse('stock:producto_update', kwargs={'pk': self.producto.pk}),
+            {'nombre': 'Fernet 1L', 'sector': 'barra', 'precio_unitario': '5000',
+             'unidad_medida': 'unidad'},
+            **self.CABECERA,
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.nombre, 'Fernet 1L')
+
+    def test_un_form_con_errores_vuelve_como_fragmento_y_no_redirige(self):
+        respuesta = self.client.post(
+            reverse('stock:producto_update', kwargs={'pk': self.producto.pk}),
+            {'nombre': '', 'sector': 'barra', 'precio_unitario': '5000', 'unidad_medida': 'unidad'},
+            **self.CABECERA,
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotIn('<html', respuesta.content.decode())
 
 
 class ReconciliacionTests(TestCase):
@@ -684,7 +876,7 @@ class VistasTests(ClienteLogueadoTests):
         self.evento = Evento.objects.create(nombre='Egresados', fecha=date(2026, 11, 20))
         self.empleado = Empleado.objects.create(nombre='Ana')
         self.asignacion = PersonalEvento.objects.create(
-            evento=self.evento, empleado=self.empleado, puesto='Moza', pago=40000
+            evento=self.evento, empleado=self.empleado, puesto=un_puesto('Moza'), pago=40000
         )
 
     def test_editar_personal_de_un_evento_abre(self):
@@ -712,7 +904,12 @@ class VistasTests(ClienteLogueadoTests):
             ('stock:evento_detail', {'pk': self.evento.pk}),
             ('stock:consumo_evento', {'evento_pk': self.evento.pk}),
             ('stock:cargoevento_create', {'evento_pk': self.evento.pk}),
-            ('stock:lineareceta_create_evento', {'evento_pk': self.evento.pk}),
+            ('stock:puesto_list', {}),
+            ('stock:puesto_create', {}),
+            ('stock:producto_create', {}),
+            ('stock:producto_detail', {'pk': self.producto.pk}),
+            ('stock:producto_update', {'pk': self.producto.pk}),
+            ('stock:producto_delete', {'pk': self.producto.pk}),
         ]:
             with self.subTest(url=nombre):
                 self.assertEqual(self.client.get(reverse(nombre, kwargs=kwargs)).status_code, 200)

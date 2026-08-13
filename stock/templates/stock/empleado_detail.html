@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 {% with trabajos=empleado.eventos_trabajados.all %}
 
@@ -13,13 +13,13 @@
   </div>
 
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
-    <a href="{% url 'stock:empleado_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:empleado_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       <span class="material-symbols-outlined text-[18px]">arrow_back</span><span>Volver</span>
     </a>
-    <a href="{% url 'stock:empleado_update' empleado.pk %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+    <a data-modal-link href="{% url 'stock:empleado_update' empleado.pk %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
       <span class="material-symbols-outlined text-[18px]">edit</span><span>Editar</span>
     </a>
-    <a href="{% url 'stock:empleado_delete' empleado.pk %}" class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <a data-modal-link href="{% url 'stock:empleado_delete' empleado.pk %}" class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       <span class="material-symbols-outlined text-[18px]">delete</span><span>Eliminar</span>
     </a>
   </div>
@@ -62,7 +62,7 @@
         {% for pe in trabajos %}
         <tr class="hover:bg-[#1C1C1C] transition-colors group">
           <td class="px-stack-md py-4">
-            <a href="{% url 'stock:evento_detail' pe.evento.pk %}" class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ pe.evento.nombre }}</a>
+            <a data-modal-link href="{% url 'stock:evento_detail' pe.evento.pk %}" class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ pe.evento.nombre }}</a>
           </td>
           <td class="px-stack-md py-4 text-on-surface-med">{{ pe.evento.fecha|date:"d/m/Y" }}</td>
           <td class="px-stack-md py-4">

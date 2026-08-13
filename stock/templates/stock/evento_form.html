@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <div class="w-full max-w-2xl mx-auto flex flex-col gap-stack-lg">
@@ -55,7 +55,7 @@
       </div>
 
       <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-        <a href="{% url 'stock:evento_list' %}"
+        <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:evento_list' %}"
            class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
           Cancelar
         </a>

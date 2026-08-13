@@ -4,10 +4,10 @@
 <div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
 
   <div class="mb-stack-lg">
-    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar ingrediente{% else %}Agregar ingrediente{% endif %}</h1>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar plato{% else %}Nuevo plato{% endif %}</h1>
     <p class="font-body-md text-body-md text-on-surface-med mt-unit">
-      Cuánto de este producto lleva <strong class="text-on-surface-high">{{ plato.nombre }}</strong>
-      por cada persona. Ej. 0,200 para 200 g de carne por cubierto.
+      {% if menu %}Un paso de la comida del menú <strong class="text-on-surface-high">{{ menu.nombre }}</strong>.{% else %}Un paso de la comida.{% endif %}
+      Los ingredientes se cargan después, uno por uno.
     </p>
   </div>
 
@@ -35,13 +35,8 @@
       {% endfor %}
     </div>
 
-    <div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-lg px-stack-md py-stack-sm">
-      <span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-[2px]">info</span>
-      <p class="font-body-sm text-body-sm text-on-surface-med">La receta no descuenta stock por su cuenta: sirve para costear el menú y para que el formulario de consumo te sugiera las cantidades.</p>
-    </div>
-
     <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-      <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:plato_detail' plato.pk %}"
+      <a {% if es_modal %}data-modal-close{% endif %} href="{% if menu %}{% url 'stock:menu_detail' menu.pk %}{% else %}{% url 'stock:menu_list' %}{% endif %}"
          class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
       <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
     </div>

@@ -1,12 +1,18 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <!-- ============================ Encabezado ============================ -->
 <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
-  <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Productos</h1>
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Productos</h1>
+    {% if ver_bajas %}
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">Los que están fuera de circulación. Conservan todo su historial.</p>
+    {% endif %}
+  </div>
 
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
     <form method="get" class="relative w-full sm:w-[300px]">
+      {% if ver_bajas %}<input type="hidden" name="bajas" value="1">{% endif %}
       <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-med pointer-events-none text-[20px]">search</span>
       <label class="sr-only" for="q-productos">Buscar producto</label>
       <input type="text" name="q" id="q-productos" aria-label="Buscar producto" value="{{ q|default:'' }}" placeholder="Buscar producto..." class="w-full !pl-10 !pr-10 font-body-sm text-body-sm">
@@ -15,93 +21,54 @@
       </button>
     </form>
 
-    <button type="button" data-modal-open="#modalProducto" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+    {% if not ver_bajas %}
+    <a href="{% url 'stock:producto_create' %}" data-modal-link class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
       <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo Producto</span>
-    </button>
+    </a>
+    {% endif %}
   </div>
 </header>
 
-<!-- ============================ Barra ============================ -->
-<section class="flex flex-col gap-stack-md w-full">
-  <h2 class="font-headline-sm text-headline-sm text-on-surface-high flex items-center gap-stack-sm">
-    <span class="material-symbols-outlined text-primary text-[20px]">local_bar</span>Barra
-  </h2>
-  {% include 'stock/_tabla_productos.html' with productos=productos_barra %}
-</section>
-
-<!-- ============================ Cocina ============================ -->
-<section class="flex flex-col gap-stack-md w-full">
-  <h2 class="font-headline-sm text-headline-sm text-on-surface-high flex items-center gap-stack-sm">
-    <span class="material-symbols-outlined text-primary text-[20px]">restaurant</span>Cocina
-  </h2>
-  {% include 'stock/_tabla_productos.html' with productos=productos_cocina %}
-</section>
-
-<!-- ============================ Extras ============================ -->
-<section class="flex flex-col gap-stack-md w-full">
-  <h2 class="font-headline-sm text-headline-sm text-on-surface-high flex items-center gap-stack-sm">
-    <span class="material-symbols-outlined text-primary text-[20px]">inventory_2</span>Extras
-  </h2>
-  {% include 'stock/_tabla_productos.html' with productos=productos_extras %}
-</section>
-
-<!-- ==================== Modal · Nuevo producto ==================== -->
-<div id="modalProducto" data-modal role="dialog" aria-modal="true" aria-labelledby="modalProductoTitulo"
-     class="hidden fixed inset-0 z-[100] items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto">
-  <div class="w-full max-w-2xl bg-surface-raised border border-surface-variant rounded-xl p-stack-lg shadow-2xl relative">
-    <button type="button" data-modal-close aria-label="Cerrar" class="absolute top-stack-md right-stack-md text-on-surface-variant hover:text-primary transition-colors">
-      <span class="material-symbols-outlined">close</span>
-    </button>
-
-    <div class="mb-stack-lg pr-stack-lg">
-      <h2 id="modalProductoTitulo" class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high tracking-tight">Nuevo Producto</h2>
-      <p class="font-body-md text-body-md text-on-surface-variant mt-unit">Cargá los datos del producto.</p>
-    </div>
-
-    <form method="post" action="{% url 'stock:producto_create' %}" class="flex flex-col gap-stack-lg">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-
-      <div class="flex flex-col gap-unit">
-        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_nombre">Nombre</label>
-        <input type="text" name="nombre" id="id_modal_nombre" maxlength="100" required placeholder="Ej. Fernet Branca" class="w-full font-body-md text-body-md">
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-        <div class="flex flex-col gap-unit">
-          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_sector">Sector</label>
-          <select name="sector" id="id_modal_sector" required class="w-full font-body-md text-body-md">
-            <option value="barra">Barra</option>
-            <option value="cocina">Cocina</option>
-            <option value="extras">Extras</option>
-          </select>
-        </div>
-
-        <div class="flex flex-col gap-unit">
-          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_unidad_medida">Unidad de medida</label>
-          <input type="text" name="unidad_medida" id="id_modal_unidad_medida" value="unidad" maxlength="20" required placeholder="Ej. unidad, litro, kg" class="w-full font-body-md text-body-md">
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-        <div class="flex flex-col gap-unit">
-          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_stock_actual">Stock inicial</label>
-          <input type="number" name="stock_actual" id="id_modal_stock_actual" value="0" step="0.01" min="0" class="w-full font-body-md text-body-md">
-          <p class="font-body-sm text-body-sm text-on-surface-med">Se registra como una entrada, para que el historial cierre.</p>
-        </div>
-
-        <div class="flex flex-col gap-unit">
-          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_precio_unitario">Precio unitario</label>
-          <input type="number" name="precio_unitario" id="id_modal_precio_unitario" step="0.01" min="0" value="0" required class="w-full font-body-md text-body-md">
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-        <button type="button" data-modal-close class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</button>
-        <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
-      </div>
-    </form>
-  </div>
+<!-- ============================ Sectores ============================ -->
+<div data-tabs data-tab-default="#barra-pane" role="tablist" aria-label="Sectores"
+     class="flex border-b border-outline-variant gap-stack-md sm:gap-gutter overflow-x-auto">
+  <button type="button" id="barra-tab" role="tab" aria-controls="barra-pane" aria-selected="false" data-tab-target="#barra-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Barra</button>
+  <button type="button" id="cocina-tab" role="tab" aria-controls="cocina-pane" aria-selected="false" data-tab-target="#cocina-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Cocina</button>
+  <button type="button" id="extras-tab" role="tab" aria-controls="extras-pane" aria-selected="false" data-tab-target="#extras-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Extras</button>
 </div>
+
+<div id="barra-pane" data-tab-panel role="tabpanel" aria-labelledby="barra-tab">
+  {% include 'stock/_tabla_productos.html' with productos=productos_barra %}
+</div>
+
+<div id="cocina-pane" data-tab-panel role="tabpanel" aria-labelledby="cocina-tab" class="hidden">
+  {% include 'stock/_tabla_productos.html' with productos=productos_cocina %}
+</div>
+
+<div id="extras-pane" data-tab-panel role="tabpanel" aria-labelledby="extras-tab" class="hidden">
+  {% include 'stock/_tabla_productos.html' with productos=productos_extras %}
+</div>
+
+<!-- ==================== Dados de baja (RN-20) ==================== -->
+{% if ver_bajas %}
+<div class="flex justify-start">
+  <a href="{% url 'stock:producto_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">arrow_back</span><span>Volver a los productos en uso</span>
+  </a>
+</div>
+{% elif cantidad_bajas %}
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md bg-surface-raised border border-surface-overlay rounded-xl px-stack-lg py-stack-md">
+  <p class="font-body-sm text-body-sm text-on-surface-med flex items-start gap-stack-sm">
+    <span class="material-symbols-outlined text-[18px] text-on-surface-med shrink-0 mt-[2px]">visibility_off</span>
+    <span>Hay <strong class="text-on-surface">{{ cantidad_bajas }}</strong> producto{{ cantidad_bajas|pluralize }} dado{{ cantidad_bajas|pluralize }} de baja. No se listan acá, pero su historial y sus costos siguen intactos.</span>
+  </p>
+  <a href="?bajas=1" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">restore_from_trash</span><span>Ver dados de baja</span>
+  </a>
+</div>
+{% endif %}
 
 {% endblock %}

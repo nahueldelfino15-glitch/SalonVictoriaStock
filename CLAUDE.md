@@ -44,16 +44,18 @@ config/            # settings, urls raíz, wsgi/asgi
   settings.py      # SECRET_KEY hardcodeada, DEBUG=True
   urls.py          # /admin/ + include('stock.urls')
 stock/
-  models.py        # 7 modelos, toda la lógica de negocio vive acá
-  views.py         # CBV para CRUD + 4 FBV (home, compras, calendario, consumo)
+  models.py        # 11 modelos, toda la lógica de negocio vive acá
+  views.py         # CBV para CRUD + FBV (home, compras, merma, calendario, consumo)
   urls.py          # namespace 'stock'
-  admin.py         # registra Producto, Evento, Empleado, MovimientoStock
-  templates/stock/ # 35 templates
-    base.html      # tokens Tailwind + nav + helpers JS (tabs, modales, menú)
-    _tabla_*.html  # 3 parciales de tabla (productos, compras, consumo)
+  admin.py         # registra Producto, Evento, Empleado, MovimientoStock, Plato, Puesto
+  context_processors.py # resuelve `base_template`: página completa o fragmento de modal
+  templates/stock/ # 41 templates
+    base.html      # tokens Tailwind + sidebar + helpers JS (tabs, modales, modal remoto)
+    _base_modal.html  # base "vacía": sirve cualquier pantalla como fragmento (RN-22)
+    _tabla_*.html  # 4 parciales de tabla (productos, compras, consumo, merma)
     _chip_estado.html # chip de estado del evento, compartido por 7 pantallas
   static/stock/img/LogoVictoria.png
-  migrations/      # 0001 → 0005
+  migrations/      # 0001 → 0010
 db.sqlite3
 manage.py
 ```
@@ -68,10 +70,14 @@ Las FBV rompen el patrón: `home`, `compras`, `calendario`, `consumo_selector`, 
 
 ```
 Paquete ──┐
-Menu ─────┼──> Evento <── PersonalEvento ──> Empleado
-          │       ^
-          │       │
-          └───────┴── MovimientoStock ──> Producto
+Menu ─────┼──> Evento <── PersonalEvento ──> Empleado ──> Puesto
+  │       │       ^                              ^           │
+  │       │       │                              └───────────┘
+  │       └───────┴── MovimientoStock ──> Producto
+  │                                          ^
+  └──> Plato ──> LineaReceta ────────────────┘
+         ^
+         └── (o de un Evento: la copia heredada)
 ```
 
 ### `Producto`
@@ -87,14 +93,26 @@ Núcleo del sistema. `estado` ∈ `pendiente | confirmado | finalizado`.
 Campos: `nombre`, `fecha` (DateField, sin hora), `asistentes`, `estado`, `paquete` (FK opcional), `menu` (FK opcional), `telefono_contacto`, `notas`.
 Propiedades calculadas: `gasto_stock`, `gasto_personal`, `gasto_total`.
 
+### `Puesto`
+Catálogo de puestos, administrable desde `/puestos/`. Solo `nombre` (único).
+Ver RN-21.
+
 ### `Empleado`
 Catálogo maestro de personal, **independiente de los eventos**.
-`nombre`, `telefono`, `puesto_habitual`.
+`nombre`, `telefono`, `puesto_habitual` (FK a `Puesto`, SET_NULL).
 
 ### `PersonalEvento`
 Tabla de asignación: un empleado trabajando en un evento puntual.
-`evento` (CASCADE), `empleado` (**PROTECT**), `puesto`, `horas_trabajadas`, `pago`.
+`evento` (CASCADE), `empleado` (**PROTECT**), `puesto` (FK a `Puesto`, **PROTECT**),
+`horas_trabajadas`, `pago`.
 El `puesto` acá pisa al `puesto_habitual` del empleado — es el puesto de ESE evento.
+
+### `Plato` / `LineaReceta`
+La receta de un menú, en dos niveles. Ver RN-18.
+`Plato`: `paso` ∈ `entrante | principal | secundario | postre`, `nombre`, y un dueño
+(`menu` **o** `evento`, nunca los dos).
+`LineaReceta`: `plato` (CASCADE), `producto` (**PROTECT**), `cantidad_por_persona`
+(Decimal 10,**3**).
 
 ### `MovimientoStock`
 Libro mayor del stock. `tipo` ∈ `entrada | salida`.
@@ -180,8 +198,8 @@ form de evento.
 
 ### RN-8 · Los productos viven en 3 sectores, siempre
 `barra`, `cocina`, `extras` están hardcodeados en `SECTOR_CHOICES` y se repiten
-como tres pestañas / tres tablas en Stock, Compras y Consumo. Agregar un sector
-implica tocar el modelo **y** las tres pantallas.
+como tres pestañas en **Productos**, Compras, Merma y Consumo. Agregar un sector
+implica tocar el modelo **y** las cuatro pantallas.
 
 Orden de listado: `Lower('nombre')` — alfabético case-insensitive.
 
@@ -297,16 +315,29 @@ peor que no tener número: por eso, sin precio cargado, la pantalla dice
 `Evento.tiene_precio_cargado` distingue esos dos casos, y `margen_porcentaje`
 devuelve `None` cuando no hay ingreso en vez de dividir por cero.
 
-### RN-18 · La receta se copia, no se referencia
-`LineaReceta` (producto + `cantidad_por_persona`) tiene **dos dueños posibles** y
-nunca los dos a la vez — lo garantiza un `CheckConstraint`:
+### RN-18 · La receta se carga en el MENÚ, organizada por platos
+La receta es un árbol de tres niveles:
 
-- colgada de un **`Menu`**: la receta base. `Menu.costo_por_persona` la usa para
-  costear el cubierto y poder ponerle precio.
-- colgada de un **`Evento`**: la copia ajustada de ESE evento ("estos van sin cerdo").
+```
+Menu ──> Plato (paso + nombre) ──> LineaReceta (producto + cantidad_por_persona)
+```
 
-`Evento.copiar_receta_del_menu()` trae la base como punto de partida y **reemplaza**
-lo que hubiera (es "volver a la base", no "sumar otra vez").
+`Plato.paso` ∈ `entrante | principal | secundario | postre`, y tiene **nombre
+propio** ("Bife con papas"), porque un menú real no es una bolsa de ingredientes:
+es una sucesión de platos. `Meta.ordering` usa un `Case/When` (`ORDEN_DE_SERVICIO`)
+para que el entrante vaya antes que el principal — alfabéticamente sería al revés.
+
+`Plato` tiene **dos dueños posibles** y nunca los dos a la vez (`CheckConstraint`):
+
+- colgado de un **`Menu`**: la receta base. `Menu.costo_por_persona` la recorre
+  entera para costear el cubierto y poder ponerle precio.
+- colgado de un **`Evento`**: la copia heredada de ese menú.
+
+**El evento hereda la receta solo**: `Evento.save()` detecta que el menú cambió y
+llama a `copiar_receta_del_menu()`, que **reemplaza** lo que hubiera. Guardar el
+evento por cualquier otro motivo NO recopia — si no, corregir un teléfono pisaría
+la receta. `/eventos/<pk>/receta/copiar/` (POST) la vuelve a traer a mano, para
+cuando el menú se corrigió con el evento ya cargado.
 
 Son copias a propósito: si el evento apuntara al menú, cambiar la receta base en
 marzo cambiaría lo que se calculó para un evento de enero. El menú evoluciona; lo
@@ -324,10 +355,23 @@ alguna receta esté usando.
 cantidades aparecen **precargadas** en los inputs de la pantalla de consumo. El
 usuario corrige con lo que realmente salió y confirma.
 
+Un mismo producto puede estar en varios platos (la papa va en el principal y en la
+guarnición): se **suman las porciones antes de redondear**, y sale UNA sola línea
+de consumo. Dos redondeos por separado dan otro número.
+
+`Evento.receta_calculada` es lo mismo pero agrupado por plato, y es lo que queda
+asentado en el detalle del evento. Cuelga los ingredientes de cada plato como
+atributo (`plato.ingredientes`) porque los templates de Django no pueden llamar a
+un método con argumentos: `plato.para(asistentes)` no se puede escribir en el HTML.
+
 **Ningún camino descuenta stock automáticamente.** Es la decisión 8 del dueño: el
 consumo se registra después del evento y siempre es un acto humano. Si se
 descontara solo, el stock del sistema divergiría del real cada vez que sobre o
 falte algo — que es exactamente el problema que veníamos a resolver.
+
+⚠️ La receta **no se carga desde Consumo**. Esa pantalla se quedó solo con lo suyo
+(barra / cocina / extras / personal). Tener dos lugares para cargar lo mismo
+garantiza que se contradigan.
 
 ### RN-20 · Un producto con historial no se borra: se da de baja
 `MovimientoStock.producto` usa **`PROTECT`**, no `CASCADE`.
@@ -345,6 +389,66 @@ $900.000 con un solo click, y mostraba el número nuevo con total confianza.
 `ProductoDeleteView` atrapa el `ProtectedError` y da de baja en vez de explotar, con
 un mensaje que explica qué pasó. Si el producto no tiene movimientos, se borra normal.
 
+⚠️ Un producto dado de baja **tampoco se lista en Productos**. Existe para sostener
+el historial, no para llenar la pantalla de cosas que ya no se compran. Se ven con
+`?bajas=1`, que es además la única forma de reactivarlos; la pantalla avisa cuántos
+hay para que nadie crea que se perdieron.
+
+### RN-21 · Los puestos son un catálogo, no una constante
+`Puesto` es una tabla con CRUD propio en `/puestos/`. `Empleado.puesto_habitual` y
+`PersonalEvento.puesto` son FK a esa tabla, y los selects se llenan desde ahí.
+
+No son `choices` en el código porque el salón cambia de servicios: tiene que poder
+agregar "Valet" o "Fotógrafo" sin esperar un deploy. La migración `0010` los siembra
+con los siete que pidió el dueño (Mozo, Barman, Cocina, Dj, Limpieza, Seguridad,
+Otro) y de ahí en adelante los administra él.
+
+Los `on_delete` van distinto a propósito:
+- `Empleado.puesto_habitual` → **SET_NULL**: es solo el puesto que suele ocupar.
+- `PersonalEvento.puesto` → **PROTECT**: es historial de pagos. Borrar "Barman" del
+  catálogo dejaría sin etiqueta lo que ya se liquidó. `PuestoDeleteView` atrapa el
+  `ProtectedError` y avisa en cuántas asignaciones está usado.
+
+⚠️ Los datos viejos venían sucios (`Moso`, `moso`, `Barra`): la migración los
+normaliza con una tabla de alias. Un texto que no reconoce lo crea como puesto tal
+cual — perder un dato cargado por no reconocerlo sería peor que un puesto de más.
+
+### RN-22 · Todo el CRUD se abre en un modal, con el MISMO template
+No hay templates duplicados para la versión modal. Lo único que cambia es de qué
+hereda el template:
+
+```django
+{% extends base_template|default:'stock/base.html' %}
+```
+
+`stock/context_processors.modal` resuelve `base_template` a `_base_modal.html`
+cuando la request trae `X-Requested-With: XMLHttpRequest`, y a `base.html` si no.
+Va como **context processor y no como mixin** para no tocar las 30 CBV y para que
+cualquier pantalla nueva lo tenga gratis.
+
+En el HTML basta con marcar el enlace:
+
+```html
+<a href="{% url 'stock:producto_update' p.pk %}" data-modal-link>Editar</a>
+```
+
+El JS de `base.html` hace el fetch, mete el fragmento en `#modalRemoto` y manda los
+forms sin recargar. **Distingue "guardó" de "hay errores" por el redirect**: si la
+respuesta viene redirigida, navega ahí; si viene HTML, lo repinta con los errores.
+
+⚠️ `_base_modal.html` **no imprime los mensajes de Django** a propósito. Si los
+imprimiera quedarían consumidos y la pantalla a la que se redirige después de
+guardar no mostraría nada.
+
+⚠️ Tampoco incluye `extra_js`: los `<script>` insertados por `innerHTML` no se
+ejecutan, así que ofrecerlo sería prometer algo que no pasa.
+
+⚠️ El `href` siempre apunta a una pantalla completa que funciona sola. El modal es
+una mejora, no un requisito: sin JS, con Ctrl+click o si el fetch falla, la URL
+suelta sigue andando. Los botones "Cancelar" llevan
+`{% if es_modal %}data-modal-close{% endif %}` — condicional, porque el atributo
+suelto haría `preventDefault()` en la página normal y el link no navegaría.
+
 ---
 
 ## 5. Flujos de usuario
@@ -356,11 +460,21 @@ un mensaje que explica qué pasó. Si el producto no tiene movimientos, se borra
 cantidad → `+ Agregar` → genera `salida` atada al evento.
 La cuarta pestaña ("Personal") de esa misma pantalla asigna empleados al evento.
 
-**Alta de producto** → modal en `/productos/` (no una página aparte). El form
-postea a `producto_create`; la vista de creación es la misma CBV.
+**Alta / edición / baja / detalle de cualquier cosa** → **modal** sobre el listado
+(RN-22). No hay forms duplicados: el modal carga por fetch el mismo template de la
+pantalla suelta.
 
-**Ver rentabilidad de un evento** → `/eventos/<pk>/` → tabla de consumo + tabla de
-personal + gasto total.
+**Cargar la receta de un menú** → `/menus/<pk>/` → por cada paso (entrante,
+principal, secundario, postre) → `+ Agregar plato` → dentro del plato,
+`+ Agregar ingrediente` con la cantidad **por persona**. El pie muestra el costo
+del cubierto.
+
+**Ver cuánto hace falta para un evento** → asignarle el menú al evento (la receta
+se copia sola) → `/eventos/<pk>/` → sección "Receta del evento", con las cantidades
+ya multiplicadas por los asistentes.
+
+**Ver rentabilidad de un evento** → `/eventos/<pk>/` → receta estimada + tabla de
+consumo + tabla de personal + cargos + margen.
 
 ---
 
@@ -427,7 +541,14 @@ Bootstrap se fue completo. `base.html` trae tres helpers propios, sin dependenci
 con `hidden`), cierre por `data-modal-close`, Escape o click en el overlay.
 `data-modal-autoopen` lo abre solo al cargar (lo usa el modal de mensajes).
 
-**Menú mobile** — hamburguesa, se cierra con Escape.
+**Modal remoto** — `data-modal-link` en un `<a>` con `href` real (RN-22).
+
+**Panel lateral** — reemplazó al nav horizontal. Colapsa a solo iconos en
+escritorio y entra/sale completo en mobile. El ancho y el margen del contenido se
+manejan con **CSS sobre `html[data-sidebar="colapsado"]`**, no con clases de
+Tailwind toggleadas por JS: así un script inline en el `<head>` aplica el estado
+guardado en `localStorage` **antes del primer pintado**. Con JS al final, cada
+carga mostraría el panel abierto y lo cerraría de golpe a la vista del usuario.
 
 API pública por si una pantalla la necesita: `window.Victoria.abrirModal()`,
 `.cerrarModal()`, `.activarTab()`.
@@ -477,17 +598,19 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
    dato cargado es ambiguo. Los 3 eventos existentes quedaron **sin precio**: hay
    que cargárselo a mano para que muestren margen.
 
-4. **`Menu` no tiene precio ni composición** — no se puede costear un menú ni
-   precargar el consumo desde una receta. Fase 4, la única que queda pendiente.
+4. **`Menu` sigue sin precio de venta.** Ya tiene composición y
+   `costo_por_persona` (RN-18), así que se sabe cuánto CUESTA el cubierto, pero no
+   a cuánto se vende: el precio se carga a mano en cada evento (RN-17). Falta
+   decidir si el menú debe proponerlo.
 
 ### 🟡 Medios
 
 5. **`MovimientoStock.fecha` es `auto_now_add`**, no editable: si cargás el lunes
    lo del sábado, la fecha miente.
 
-6. **`horas_trabajadas` no calcula el pago** y `Empleado` no tiene tarifa. El pago
-   se carga a mano en cada evento, y el mismo empleado puede cargarse dos veces
-   en el mismo evento, duplicando el pago sin aviso.
+6. **`horas_trabajadas` no calcula el pago** y ni `Empleado` ni `Puesto` tienen
+   tarifa. El pago se carga a mano en cada evento, y el mismo empleado puede
+   cargarse dos veces en el mismo evento, duplicando el pago sin aviso.
    ⚠️ El `unique_together` NO se puede agregar sin más: los datos actuales YA tienen
    duplicados (3 filas de `PersonalEvento` con mismo evento/empleado/puesto), así que
    la migración fallaría. Hay que fusionarlos primero.
@@ -501,8 +624,11 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
    sincronización del proyecto. Sacarlo es una decisión aparte, no un descuido.
    El backup `db.sqlite3.backup-*` sí está ignorado.
 9. La migración `0002` eliminó `Evento.hora_inicio`: los eventos manejan fecha, no hora.
-10. `Menu` no tiene precio ni composición, así que no se puede costear ni precargar
-    el consumo. Fase 4.
+10. **El modal remoto gasta un request de más al guardar.** El fetch sigue el
+    redirect para saber a dónde ir, y después el browser navega ahí de nuevo. Se
+    podría evitar con `redirect: 'manual'`, pero entonces no se sabe el destino y
+    habría que recargar la pantalla actual — que no siempre es la correcta (borrar
+    un evento desde su detalle). Es una app interna de un solo salón: se paga.
 
 ### ✅ Resueltos en la auditoría del 2026-08-12
 

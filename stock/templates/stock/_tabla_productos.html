@@ -27,10 +27,10 @@
           </td>
           <td class="px-stack-md py-4 text-on-surface-med">$ {{ producto.precio_unitario }}</td>
           <td class="px-stack-md py-4 text-right whitespace-nowrap">
-            <a href="{% url 'stock:producto_detail' producto.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
-            <a href="{% url 'stock:producto_update' producto.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:producto_detail' producto.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+            <a data-modal-link href="{% url 'stock:producto_update' producto.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
             {% if producto.activo %}
-            <a href="{% url 'stock:producto_delete' producto.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            <a data-modal-link href="{% url 'stock:producto_delete' producto.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
             {% else %}
             <form method="post" action="{% url 'stock:producto_reactivar' producto.pk %}" class="inline-flex ml-2">
               {% csrf_token %}

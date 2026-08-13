@@ -21,7 +21,9 @@ from .models import (
     MovimientoStock,
     Paquete,
     PersonalEvento,
+    Plato,
     Producto,
+    Puesto,
 )
 
 
@@ -63,12 +65,23 @@ class ProductoListView(ListView):
     context_object_name = 'productos'
 
     def get_context_data(self, **kwargs):
+        """Un sector por pestaña, y solo lo que está en circulación (RN-20).
+
+        Los dados de baja no se listan: existen para sostener el historial, no
+        para llenar la pantalla de cosas que ya no se compran. Se ven con
+        ?bajas=1, que es también la única forma de reactivarlos.
+        """
         context = super().get_context_data(**kwargs)
         q = self.request.GET.get('q', '')
-        context['productos_barra'] = Producto.objects.filter(sector='barra', nombre__icontains=q).order_by(Lower('nombre'))
-        context['productos_cocina'] = Producto.objects.filter(sector='cocina', nombre__icontains=q).order_by(Lower('nombre'))
-        context['productos_extras'] = Producto.objects.filter(sector='extras', nombre__icontains=q).order_by(Lower('nombre'))
+        ver_bajas = bool(self.request.GET.get('bajas'))
+
+        productos = Producto.objects.filter(nombre__icontains=q, activo=not ver_bajas)
+        for sector, _ in SECTOR_CHOICES:
+            context[f'productos_{sector}'] = productos.filter(sector=sector).order_by(Lower('nombre'))
+
         context['q'] = q
+        context['ver_bajas'] = ver_bajas
+        context['cantidad_bajas'] = Producto.objects.filter(activo=False).count()
         return context
 
 
@@ -230,7 +243,7 @@ class EmpleadoListView(ListView):
     context_object_name = 'empleados'
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related('puesto_habitual')
         q = self.request.GET.get('q')
         if q:
             queryset = queryset.filter(nombre__icontains=q)
@@ -329,60 +342,179 @@ class PersonalEventoDeleteView(DeleteView):
         return reverse_lazy('stock:evento_detail', kwargs={'pk': self.object.evento.pk})
 
 
-# ---------- Recetas (líneas de menú o de evento) ----------
-class LineaRecetaCreateView(CreateView):
-    """Sirve para las dos recetas: la base del menú y la ajustada del evento.
+# ---------- Puestos (catálogo administrable) ----------
+class PuestoListView(ListView):
+    model = Puesto
+    template_name = 'stock/puesto_list.html'
+    context_object_name = 'puestos'
 
-    Cuál es se define por la URL de la que viene (menu_pk o evento_pk).
-    """
+
+class PuestoCreateView(CreateView):
+    model = Puesto
+    fields = ['nombre']
+    template_name = 'stock/puesto_form.html'
+    success_url = reverse_lazy('stock:puesto_list')
+
+
+class PuestoUpdateView(UpdateView):
+    model = Puesto
+    fields = ['nombre']
+    template_name = 'stock/puesto_form.html'
+    success_url = reverse_lazy('stock:puesto_list')
+
+
+class PuestoDeleteView(DeleteView):
+    model = Puesto
+    template_name = 'stock/puesto_confirm_delete.html'
+    success_url = reverse_lazy('stock:puesto_list')
+
+    def form_valid(self, form):
+        """Un puesto usado en un evento no se borra: es histórico de pagos."""
+        puesto = self.object
+        try:
+            with transaction.atomic():
+                return super().form_valid(form)
+        except ProtectedError:
+            messages.error(
+                self.request,
+                f'"{puesto.nombre}" está usado en {puesto.asignaciones.count()} asignación'
+                f'{"es" if puesto.asignaciones.count() != 1 else ""} de personal, así que no se '
+                'puede borrar. Cambiales el puesto primero si querés sacarlo.',
+            )
+            return redirect(self.success_url)
+
+
+# ---------- Recetas: platos y sus ingredientes ----------
+class PlatoCreateView(CreateView):
+    """Un paso de la comida dentro de un menú (entrante, principal, postre…)."""
+
+    model = Plato
+    fields = ['paso', 'nombre']
+    template_name = 'stock/plato_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.menu = get_object_or_404(Menu, pk=self.kwargs['menu_pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        paso = self.request.GET.get('paso')
+        if paso:
+            form.initial['paso'] = paso
+        return form
+
+    def form_valid(self, form):
+        form.instance.menu = self.menu
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['menu'] = self.menu
+        return context
+
+    def get_success_url(self):
+        return reverse('stock:menu_detail', kwargs={'pk': self.menu.pk})
+
+
+class PlatoUpdateView(UpdateView):
+    model = Plato
+    fields = ['paso', 'nombre']
+    template_name = 'stock/plato_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['menu'] = self.object.menu
+        return context
+
+    def get_success_url(self):
+        return volver_del_plato(self.object)
+
+
+class PlatoDetailView(DetailView):
+    model = Plato
+    template_name = 'stock/plato_detail.html'
+
+
+class PlatoDeleteView(DeleteView):
+    model = Plato
+    template_name = 'stock/plato_confirm_delete.html'
+
+    def get_success_url(self):
+        return volver_del_plato(self.object)
+
+
+def volver_del_plato(plato):
+    """El plato es del menú o de un evento (RN-18): cada uno vuelve a su pantalla."""
+    if plato.menu_id:
+        return reverse('stock:menu_detail', kwargs={'pk': plato.menu_id})
+    return reverse('stock:evento_detail', kwargs={'pk': plato.evento_id})
+
+
+class LineaRecetaCreateView(CreateView):
+    """Un ingrediente del plato, medido por persona."""
 
     model = LineaReceta
     fields = ['producto', 'cantidad_por_persona']
     template_name = 'stock/lineareceta_form.html'
 
     def dispatch(self, request, *args, **kwargs):
-        self.menu = get_object_or_404(Menu, pk=kwargs['menu_pk']) if 'menu_pk' in kwargs else None
-        self.evento = get_object_or_404(Evento, pk=kwargs['evento_pk']) if 'evento_pk' in kwargs else None
+        self.plato = get_object_or_404(Plato, pk=self.kwargs['plato_pk'])
         return super().dispatch(request, *args, **kwargs)
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['instance'] = LineaReceta(menu=self.menu, evento=self.evento)
-        return kwargs
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Un producto dado de baja no se puede seguir usando en recetas nuevas (RN-20).
+        form.fields['producto'].queryset = Producto.objects.filter(activo=True).order_by(Lower('nombre'))
+        return form
 
     def form_valid(self, form):
-        form.instance.menu = self.menu
-        form.instance.evento = self.evento
+        form.instance.plato = self.plato
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['menu'] = self.menu
-        context['evento'] = self.evento
+        context['plato'] = self.plato
         return context
 
     def get_success_url(self):
-        return volver_de_la_receta(self.menu, self.evento)
+        return reverse('stock:plato_detail', kwargs={'pk': self.plato.pk})
+
+
+class LineaRecetaUpdateView(UpdateView):
+    model = LineaReceta
+    fields = ['producto', 'cantidad_por_persona']
+    template_name = 'stock/lineareceta_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['plato'] = self.object.plato
+        return context
+
+    def get_success_url(self):
+        return reverse('stock:plato_detail', kwargs={'pk': self.object.plato_id})
 
 
 class LineaRecetaDeleteView(DeleteView):
     model = LineaReceta
     template_name = 'stock/lineareceta_confirm_delete.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['plato'] = self.object.plato
+        return context
+
     def get_success_url(self):
-        return volver_de_la_receta(self.object.menu, self.object.evento)
-
-
-def volver_de_la_receta(menu, evento):
-    if menu is not None:
-        return reverse('stock:menu_detail', kwargs={'pk': menu.pk})
-    return reverse('stock:consumo_evento', kwargs={'evento_pk': evento.pk}) + '#receta-pane'
+        return reverse('stock:plato_detail', kwargs={'pk': self.object.plato_id})
 
 
 def copiar_receta(request, pk):
-    """Trae la receta del menú del evento como punto de partida (RN-18)."""
+    """Vuelve a traer la receta del menú, por si el menú cambió después (RN-18).
+
+    El evento ya la hereda solo al asignársele el menú: esto es para cuando la
+    receta base se corrigió con el evento ya cargado.
+    """
     evento = get_object_or_404(Evento, pk=pk)
-    destino = reverse('stock:consumo_evento', kwargs={'evento_pk': evento.pk}) + '#receta-pane'
+    destino = reverse('stock:evento_detail', kwargs={'pk': evento.pk})
 
     if request.method != 'POST':
         return redirect(destino)
@@ -390,17 +522,16 @@ def copiar_receta(request, pk):
     if evento.cerrado:
         messages.error(request, f'"{evento.nombre}" está cerrado. Reabrilo si necesitás corregirlo.')
     elif not evento.menu_id:
-        messages.error(request, 'Este evento no tiene un menú asignado, así que no hay receta que copiar.')
+        messages.error(request, 'Este evento no tiene un menú asignado, así que no hay receta que traer.')
     else:
-        copiadas = evento.copiar_receta_del_menu()
-        if copiadas:
+        copiados = evento.copiar_receta_del_menu()
+        if copiados:
             messages.success(
                 request,
-                f'Copiamos {copiadas} producto{"s" if copiadas != 1 else ""} de "{evento.menu.nombre}". '
-                'Ajustá lo que haga falta para este evento.',
+                f'Trajimos {copiados} plato{"s" if copiados != 1 else ""} de "{evento.menu.nombre}".',
             )
         else:
-            messages.error(request, f'"{evento.menu.nombre}" todavía no tiene productos cargados en su receta.')
+            messages.error(request, f'"{evento.menu.nombre}" todavía no tiene platos cargados.')
 
     return redirect(destino)
 
@@ -793,5 +924,6 @@ def consumo_evento(request, evento_pk):
         context[f'productos_{sector}'] = productos
 
     context['evento'] = evento
-    context['empleados'] = Empleado.objects.all().order_by('nombre')
+    context['empleados'] = Empleado.objects.select_related('puesto_habitual').order_by('nombre')
+    context['puestos'] = Puesto.objects.all()
     return render(request, 'stock/consumo_evento.html', context)

@@ -63,7 +63,16 @@ class Menu(models.Model):
         Sirve para poner precio, así que acá SÍ va el precio actual del catálogo:
         es una proyección hacia adelante, no un histórico (eso es RN-15).
         """
-        return sum(linea.costo_por_persona for linea in self.lineas.all())
+        return sum(
+            linea.costo_por_persona
+            for plato in self.platos.all()
+            for linea in plato.lineas.all()
+        )
+
+    @property
+    def platos_por_paso(self):
+        """Los platos agrupados por momento de la comida, en orden de servicio."""
+        return agrupar_por_paso(self.platos.all())
 
 ESTADO_CHOICES = [
     ('pendiente', 'Pendiente'),
@@ -116,41 +125,89 @@ class Evento(models.Model):
 
     # ----- Receta (RN-18) -----
 
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        """Asignarle un menú al evento le trae la receta sola (RN-18).
+
+        La receta se carga en UN solo lugar: el menú. El evento la hereda al
+        quedar asignado, y esa copia es la que queda asentada en su detalle.
+        Solo se recopia cuando el menú CAMBIA: guardar el evento por cualquier
+        otro motivo no puede pisar lo que ya está calculado.
+        """
+        menu_anterior = (
+            None if self._state.adding
+            else Evento.objects.filter(pk=self.pk).values_list('menu_id', flat=True).first()
+        )
+        super().save(*args, **kwargs)
+        if self.menu_id and self.menu_id != menu_anterior:
+            self.copiar_receta_del_menu()
+
     def copiar_receta_del_menu(self):
         """Trae la receta del menú asignado como punto de partida del evento.
 
         Reemplaza lo que hubiera: es "volver a la base", no "sumar de nuevo".
-        Devuelve cuántas líneas copió.
+        Devuelve cuántos platos copió.
         """
         if not self.menu_id:
             return 0
         with transaction.atomic():
-            self.receta.all().delete()
-            LineaReceta.objects.bulk_create([
-                LineaReceta(
-                    evento=self,
-                    producto_id=linea.producto_id,
-                    cantidad_por_persona=linea.cantidad_por_persona,
-                )
-                for linea in self.menu.lineas.all()
-            ])
-        return self.receta.count()
+            self.platos.all().delete()
+            for base in self.menu.platos.prefetch_related('lineas'):
+                copia = Plato.objects.create(evento=self, paso=base.paso, nombre=base.nombre)
+                LineaReceta.objects.bulk_create([
+                    LineaReceta(
+                        plato=copia,
+                        producto_id=linea.producto_id,
+                        cantidad_por_persona=linea.cantidad_por_persona,
+                    )
+                    for linea in base.lineas.all()
+                ])
+        return self.platos.count()
+
+    @property
+    def platos_por_paso(self):
+        """La receta de ESTE evento agrupada por momento de la comida."""
+        return agrupar_por_paso(self.platos.all())
+
+    @property
+    def receta_calculada(self):
+        """La receta con las cantidades ya resueltas para los asistentes.
+
+        Los ingredientes se cuelgan de cada plato porque los templates de Django
+        no pueden llamar a un método con argumentos: `plato.para(asistentes)` no
+        se puede escribir en el HTML, `plato.ingredientes` sí.
+        """
+        grupos = agrupar_por_paso(self.platos.prefetch_related('lineas__producto'))
+        for grupo in grupos:
+            for plato in grupo['platos']:
+                plato.ingredientes = plato.para(self.asistentes)
+        return grupos
 
     @property
     def consumo_sugerido(self):
         """Lo que la receta calcula para esta cantidad de gente.
 
+        Un mismo producto puede aparecer en varios platos (la papa va en el
+        principal y en la guarnición): se suman las porciones ANTES de redondear,
+        si no dos redondeos por separado se llevan el resultado.
+
         Es una SUGERENCIA: no descuenta nada (RN-19). Precarga el formulario de
         consumo y el usuario corrige con lo que realmente salió.
         """
-        return [
-            {
-                'producto': linea.producto,
-                'cantidad': linea.cantidad_para(self.asistentes),
-                'por_persona': linea.cantidad_por_persona,
-            }
-            for linea in self.receta.select_related('producto')
-        ]
+        por_producto = {}
+        lineas = LineaReceta.objects.filter(plato__evento=self).select_related('producto')
+        for linea in lineas:
+            item = por_producto.setdefault(
+                linea.producto_id,
+                {'producto': linea.producto, 'por_persona': Decimal('0')},
+            )
+            item['por_persona'] += linea.cantidad_por_persona
+
+        for item in por_producto.values():
+            total = item['por_persona'] * (self.asistentes or 0)
+            item['cantidad'] = total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        return sorted(por_producto.values(), key=lambda item: item['producto'].nombre.lower())
 
     @property
     def costo_receta_estimado(self):
@@ -236,11 +293,38 @@ class Evento(models.Model):
             return None
         return (self.margen / self.ingreso_total) * 100
 
+class Puesto(models.Model):
+    """Catálogo de puestos, administrable desde la pantalla de Personal.
+
+    No son constantes en el código a propósito: el salón cambia de servicios y
+    tiene que poder agregar "Valet" o "Fotógrafo" sin esperar un deploy. Los
+    selects de personal se llenan desde acá.
+    """
+
+    nombre = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Puesto'
+        verbose_name_plural = 'Puestos'
+
+    def __str__(self):
+        return self.nombre
+
+
 class Empleado(models.Model):
     """Catálogo general de personal, independiente de los eventos."""
     nombre = models.CharField(max_length=100)
     telefono = models.CharField(max_length=30, blank=True)
-    puesto_habitual = models.CharField(max_length=100, blank=True)
+    puesto_habitual = models.ForeignKey(
+        Puesto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='empleados',
+        verbose_name='Puesto habitual',
+        help_text='El que hace normalmente. En cada evento se puede pisar por otro.',
+    )
 
     def __str__(self):
         return self.nombre
@@ -250,7 +334,15 @@ class PersonalEvento(models.Model):
     """Asignación de un empleado a un evento puntual."""
     evento = models.ForeignKey(Evento, on_delete=models.CASCADE, related_name='personal')
     empleado = models.ForeignKey(Empleado, on_delete=models.PROTECT, related_name='eventos_trabajados')
-    puesto = models.CharField(max_length=100, blank=True)
+    # PROTECT: acá el puesto es histórico de pagos. Borrar "Barman" del catálogo
+    # no puede dejar sin etiqueta lo que ya se liquidó.
+    puesto = models.ForeignKey(
+        Puesto,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='asignaciones',
+    )
     horas_trabajadas = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     pago = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
@@ -267,24 +359,99 @@ class PersonalEvento(models.Model):
             )
 
 
-class LineaReceta(models.Model):
-    """Cuánto de un producto se calcula por persona.
+PASO_CHOICES = [
+    ('entrante', 'Entrante'),
+    ('principal', 'Plato principal'),
+    ('secundario', 'Plato secundario'),
+    ('postre', 'Postre'),
+]
 
-    Una sola tabla para dos usos con la misma forma:
-    - colgada de un MENÚ: la receta base, sirve para costear el menú.
-    - colgada de un EVENTO: la copia ajustada de ESE evento ("estos van sin cerdo").
+# El orden de servicio no es el alfabético: se ordena por la posición en la lista.
+ORDEN_DE_SERVICIO = models.Case(
+    *[models.When(paso=clave, then=orden) for orden, (clave, _) in enumerate(PASO_CHOICES)],
+    default=len(PASO_CHOICES),
+)
 
-    Son copias y no referencias a propósito (RN-18): si el evento apuntara al menú,
-    cambiar la receta base en marzo cambiaría lo que se calculó para un evento de
-    enero. El menú evoluciona; lo ya cargado no.
+
+def agrupar_por_paso(platos):
+    """Los platos repartidos en los cuatro momentos de la comida.
+
+    Devuelve SIEMPRE los cuatro, aunque estén vacíos: en el menú sirven de
+    casilleros para cargar. La pantalla que no quiera los vacíos los filtra.
+    """
+    por_clave = {clave: [] for clave, _ in PASO_CHOICES}
+    for plato in platos:
+        por_clave.setdefault(plato.paso, []).append(plato)
+    return [
+        {'clave': clave, 'etiqueta': etiqueta, 'platos': por_clave[clave]}
+        for clave, etiqueta in PASO_CHOICES
+    ]
+
+
+class Plato(models.Model):
+    """Un paso de la comida con nombre propio y su lista de ingredientes.
+
+    Igual que LineaReceta, tiene dos dueños posibles y nunca los dos a la vez:
+    - colgado de un MENÚ: la receta base, la que se costea para poner precio.
+    - colgado de un EVENTO: la copia heredada al asignarle ese menú.
+
+    Son copias y no referencias a propósito (RN-18): si el evento apuntara al
+    menú, cambiar la receta base en marzo cambiaría lo que se calculó para un
+    evento de enero. El menú evoluciona; lo ya cargado no.
     """
 
     menu = models.ForeignKey(
-        Menu, on_delete=models.CASCADE, null=True, blank=True, related_name='lineas'
+        Menu, on_delete=models.CASCADE, null=True, blank=True, related_name='platos'
     )
     evento = models.ForeignKey(
-        Evento, on_delete=models.CASCADE, null=True, blank=True, related_name='receta'
+        Evento, on_delete=models.CASCADE, null=True, blank=True, related_name='platos'
     )
+    paso = models.CharField(max_length=12, choices=PASO_CHOICES)
+    nombre = models.CharField(max_length=120, help_text='Ej. Tabla de fiambres, Bife con papas.')
+
+    class Meta:
+        ordering = [ORDEN_DE_SERVICIO, 'nombre']
+        verbose_name = 'Plato'
+        verbose_name_plural = 'Platos'
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(menu__isnull=False, evento__isnull=True)
+                    | models.Q(menu__isnull=True, evento__isnull=False)
+                ),
+                name='plato_tiene_un_solo_dueno',
+                violation_error_message='Un plato pertenece a un menú o a un evento, no a los dos.',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.get_paso_display()}: {self.nombre}"
+
+    @property
+    def costo_por_persona(self):
+        return sum(linea.costo_por_persona for linea in self.lineas.all())
+
+    def para(self, asistentes):
+        """Los ingredientes de este plato calculados para esa cantidad de gente."""
+        return [
+            {
+                'producto': linea.producto,
+                'por_persona': linea.cantidad_por_persona,
+                'cantidad': linea.cantidad_para(asistentes),
+            }
+            for linea in self.lineas.select_related('producto')
+        ]
+
+
+class LineaReceta(models.Model):
+    """Cuánto de un producto lleva un plato, por persona.
+
+    El cálculo es siempre por cubierto (200 g de carne por persona) y se
+    multiplica por los asistentes al momento de mostrarlo. Nunca al revés: si se
+    guardara el total, cambiar la cantidad de gente dejaría la receta mintiendo.
+    """
+
+    plato = models.ForeignKey(Plato, on_delete=models.CASCADE, related_name='lineas')
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='en_recetas')
     cantidad_por_persona = models.DecimalField(
         max_digits=10,
@@ -295,23 +462,12 @@ class LineaReceta(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Línea de receta'
-        verbose_name_plural = 'Líneas de receta'
-        constraints = [
-            # Una línea es de un menú o de un evento, nunca de los dos ni de ninguno.
-            models.CheckConstraint(
-                condition=(
-                    models.Q(menu__isnull=False, evento__isnull=True)
-                    | models.Q(menu__isnull=True, evento__isnull=False)
-                ),
-                name='linea_receta_tiene_un_solo_dueno',
-                violation_error_message='Una línea de receta pertenece a un menú o a un evento, no a los dos.',
-            ),
-        ]
+        ordering = ['producto__nombre']
+        verbose_name = 'Ingrediente'
+        verbose_name_plural = 'Ingredientes'
 
     def __str__(self):
-        dueno = self.menu or self.evento
-        return f"{self.producto.nombre} x{self.cantidad_por_persona} por persona ({dueno})"
+        return f"{self.producto.nombre} x{self.cantidad_por_persona} por persona ({self.plato})"
 
     @property
     def costo_por_persona(self):

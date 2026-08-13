@@ -1,4 +1,4 @@
-{% extends 'stock/base.html' %}
+{% extends base_template|default:'stock/base.html' %}
 {% block content %}
 
 <!-- ============================ Calendario ============================ -->
@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <a href="{% url 'stock:evento_create' %}"
+    <a data-modal-link href="{% url 'stock:evento_create' %}"
        class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
       <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo Evento</span>
     </a>
@@ -53,7 +53,7 @@
                 <span class="font-body-sm text-body-sm {% if dia.es_hoy %}text-primary font-bold{% else %}text-on-surface-med{% endif %}">{{ dia.numero }}</span>
 
                 {% for evento in dia.eventos %}
-                <a href="{% url 'stock:evento_detail' evento.pk %}"
+                <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}"
                    title="{{ evento.nombre }}"
                    class="block min-w-0 bg-surface-overlay border-l-2 {% if evento.estado == 'confirmado' %}border-primary{% elif evento.estado == 'pendiente' %}border-outline-variant{% else %}border-gold-muted{% endif %} rounded-r px-2 py-1 hover:bg-[#2e2e2e] transition-colors">
                   <span class="block truncate font-body-sm text-[12px] leading-4 text-on-surface font-medium">{{ evento.nombre }}</span>
@@ -102,8 +102,8 @@
               {% include 'stock/_chip_estado.html' with evento=evento %}
             </td>
             <td class="px-stack-md py-4 text-right whitespace-nowrap">
-              <a href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
-              <a href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+              <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
             </td>
           </tr>
           {% empty %}
