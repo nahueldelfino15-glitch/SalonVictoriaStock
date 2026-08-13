@@ -1,18 +1,52 @@
-from django.urls import reverse_lazy, reverse
-from django.shortcuts import render, get_object_or_404
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from .models import Producto, Evento, Empleado, PersonalEvento, MovimientoStock
-from django.shortcuts import render, get_object_or_404, redirect
-from .models import Producto, Evento, Empleado, PersonalEvento, MovimientoStock, SECTOR_CHOICES
 import calendar
 from datetime import date
-from .models import Producto, Evento, Empleado, PersonalEvento, MovimientoStock, Paquete, Menu
-from django.db.models.functions import Lower
+from decimal import Decimal, InvalidOperation
+
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import ProtectedError
+from django.db.models.functions import Lower
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+
+from .models import (
+    SECTOR_CHOICES,
+    CargoEvento,
+    Empleado,
+    Evento,
+    LineaReceta,
+    Menu,
+    MovimientoStock,
+    Paquete,
+    PersonalEvento,
+    Producto,
+)
 
 
 MESES_ES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+# Lo más grande que entra en cantidad (max_digits=10, decimal_places=2).
+CANTIDAD_MAXIMA = Decimal('99999999.99')
+
+
+def parsear_cantidad(valor):
+    """Lo que llegó del formulario -> Decimal, o None si no es un número cargable.
+
+    Las cantidades ahora son decimales (2,5 kg / 0,75 L), así que además de
+    ValueError hay que atajar InvalidOperation, que es lo que tira Decimal()
+    con texto. 'nan' e 'infinity' son Decimal válidos pero después revientan al
+    comparar o al guardar: los sacamos acá.
+    """
+    try:
+        cantidad = Decimal(valor)
+    except (TypeError, ValueError, InvalidOperation):
+        return None
+    if not cantidad.is_finite() or cantidad > CANTIDAD_MAXIMA:
+        return None
+    return cantidad
 
 def home(request):
     year = request.GET.get('year')
@@ -49,10 +83,37 @@ class ProductoCreateView(CreateView):
     template_name = 'stock/producto_form.html'
     success_url = reverse_lazy('stock:producto_list')
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Opcional: en blanco queda en 0.
+        form.fields['stock_actual'].required = False
+        form.fields['stock_actual'].label = 'Stock inicial'
+        return form
+
+    @transaction.atomic
+    def form_valid(self, form):
+        """RN-1: el stock lo escribe el libro mayor, no el formulario.
+
+        El "stock inicial" del alta no se guarda a mano en el producto: se
+        guarda como una entrada. Así el producto nace con el movimiento que lo
+        respalda y la suma de movimientos siempre cierra con stock_actual.
+        """
+        stock_inicial = form.cleaned_data.get('stock_actual') or 0
+        form.instance.stock_actual = 0
+        respuesta = super().form_valid(form)
+        if stock_inicial > 0:
+            MovimientoStock.objects.create(
+                producto=self.object,
+                tipo='entrada',
+                cantidad=stock_inicial,
+            )
+        return respuesta
+
 
 class ProductoUpdateView(UpdateView):
     model = Producto
-    fields = ['nombre', 'sector', 'precio_unitario', 'stock_actual', 'unidad_medida']
+    # stock_actual NO se edita a mano (RN-1): se mueve con compras y consumo.
+    fields = ['nombre', 'sector', 'precio_unitario', 'unidad_medida']
     template_name = 'stock/producto_form.html'
     success_url = reverse_lazy('stock:producto_list')
 
@@ -61,6 +122,38 @@ class ProductoDeleteView(DeleteView):
     model = Producto
     template_name = 'stock/producto_confirm_delete.html'
     success_url = reverse_lazy('stock:producto_list')
+
+    def form_valid(self, form):
+        """Si el producto tiene historial no se borra: se da de baja (RN-20).
+
+        Borrarlo se llevaría puestos sus movimientos, y con ellos el costo
+        congelado de eventos ya cerrados, que cambiarían de margen solos.
+        """
+        producto = self.object
+        try:
+            with transaction.atomic():
+                respuesta = super().form_valid(form)
+        except ProtectedError:
+            producto.dar_de_baja()
+            messages.success(
+                self.request,
+                f'"{producto.nombre}" tiene movimientos cargados, así que lo dimos de baja en vez '
+                'de borrarlo. Sale de Compras, Consumo y Merma, pero su historial queda intacto.',
+            )
+            return redirect(self.success_url)
+
+        messages.success(self.request, f'Borramos "{producto.nombre}".')
+        return respuesta
+
+
+def reactivar_producto(request, pk):
+    """Vuelve a poner en circulación un producto dado de baja (RN-20)."""
+    producto = get_object_or_404(Producto, pk=pk)
+    if request.method == 'POST' and not producto.activo:
+        producto.activo = True
+        producto.save(update_fields=['activo'])
+        messages.success(request, f'"{producto.nombre}" volvió a estar disponible.')
+    return redirect('stock:producto_list')
 
 
 # ---------- Evento ----------
@@ -104,16 +197,22 @@ class EventoDetailView(DetailView):
     template_name = 'stock/evento_detail.html'
 
 
+CAMPOS_EVENTO = [
+    'nombre', 'fecha', 'asistentes', 'estado', 'paquete', 'menu',
+    'precio_por_persona', 'precio_cerrado', 'telefono_contacto', 'notas',
+]
+
+
 class EventoCreateView(CreateView):
     model = Evento
-    fields = ['nombre', 'fecha', 'asistentes', 'estado', 'paquete', 'menu', 'telefono_contacto', 'notas']
+    fields = CAMPOS_EVENTO
     template_name = 'stock/evento_form.html'
     success_url = reverse_lazy('stock:evento_list')
 
 
 class EventoUpdateView(UpdateView):
     model = Evento
-    fields = ['nombre', 'fecha', 'asistentes', 'estado', 'paquete', 'menu', 'telefono_contacto', 'notas']
+    fields = CAMPOS_EVENTO
     template_name = 'stock/evento_form.html'
     success_url = reverse_lazy('stock:evento_list')
 
@@ -178,53 +277,12 @@ class PersonalEventoCreateView(CreateView):
         self.evento = get_object_or_404(Evento, pk=self.kwargs['evento_pk'])
         return super().dispatch(request, *args, **kwargs)
 
-    def form_valid(self, form):
-        form.instance.evento = self.evento
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['evento'] = self.evento
-        return context
-
-    def get_success_url(self):
-        next_url = self.request.POST.get('next')
-        if next_url:
-            return next_url
-        return reverse_lazy('stock:evento_detail', kwargs={'pk': self.evento.pk})
-
-
-class PersonalEventoUpdateView(UpdateView):
-    model = PersonalEvento
-    fields = ['nombre', 'fecha', 'asistentes', 'notas']
-    template_name = 'stock/personalevento_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['evento'] = self.object.evento
-        return context
-
-    def get_success_url(self):
-        return reverse_lazy('stock:evento_detail', kwargs={'pk': self.object.evento.pk})
-
-
-class PersonalEventoDeleteView(DeleteView):
-    model = PersonalEvento
-    template_name = 'stock/personalevento_confirm_delete.html'
-
-    def get_success_url(self):
-        return reverse_lazy('stock:evento_detail', kwargs={'pk': self.object.evento.pk})
-
-
-# ---------- Consumo (MovimientoStock) de un Evento ----------
-class MovimientoStockCreateView(CreateView):
-    model = MovimientoStock
-    fields = ['producto', 'tipo', 'cantidad']
-    template_name = 'stock/movimientostock_form.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        self.evento = get_object_or_404(Evento, pk=self.kwargs['evento_pk'])
-        return super().dispatch(request, *args, **kwargs)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Mismo motivo que en MovimientoStockCreateView: sin el evento puesto de
+        # antemano, clean() no puede bloquear la carga sobre un evento cerrado.
+        kwargs['instance'] = PersonalEvento(evento=self.evento)
+        return kwargs
 
     def form_valid(self, form):
         form.instance.evento = self.evento
@@ -249,10 +307,10 @@ class MovimientoStockCreateView(CreateView):
         return reverse_lazy('stock:evento_detail', kwargs={'pk': self.evento.pk})
 
 
-class MovimientoStockUpdateView(UpdateView):
-    model = MovimientoStock
-    fields = ['producto', 'tipo', 'cantidad']
-    template_name = 'stock/movimientostock_form.html'
+class PersonalEventoUpdateView(UpdateView):
+    model = PersonalEvento
+    fields = ['empleado', 'puesto', 'horas_trabajadas', 'pago']
+    template_name = 'stock/personalevento_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -263,12 +321,248 @@ class MovimientoStockUpdateView(UpdateView):
         return reverse_lazy('stock:evento_detail', kwargs={'pk': self.object.evento.pk})
 
 
+class PersonalEventoDeleteView(DeleteView):
+    model = PersonalEvento
+    template_name = 'stock/personalevento_confirm_delete.html'
+
+    def get_success_url(self):
+        return reverse_lazy('stock:evento_detail', kwargs={'pk': self.object.evento.pk})
+
+
+# ---------- Recetas (líneas de menú o de evento) ----------
+class LineaRecetaCreateView(CreateView):
+    """Sirve para las dos recetas: la base del menú y la ajustada del evento.
+
+    Cuál es se define por la URL de la que viene (menu_pk o evento_pk).
+    """
+
+    model = LineaReceta
+    fields = ['producto', 'cantidad_por_persona']
+    template_name = 'stock/lineareceta_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.menu = get_object_or_404(Menu, pk=kwargs['menu_pk']) if 'menu_pk' in kwargs else None
+        self.evento = get_object_or_404(Evento, pk=kwargs['evento_pk']) if 'evento_pk' in kwargs else None
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['instance'] = LineaReceta(menu=self.menu, evento=self.evento)
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.menu = self.menu
+        form.instance.evento = self.evento
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['menu'] = self.menu
+        context['evento'] = self.evento
+        return context
+
+    def get_success_url(self):
+        return volver_de_la_receta(self.menu, self.evento)
+
+
+class LineaRecetaDeleteView(DeleteView):
+    model = LineaReceta
+    template_name = 'stock/lineareceta_confirm_delete.html'
+
+    def get_success_url(self):
+        return volver_de_la_receta(self.object.menu, self.object.evento)
+
+
+def volver_de_la_receta(menu, evento):
+    if menu is not None:
+        return reverse('stock:menu_detail', kwargs={'pk': menu.pk})
+    return reverse('stock:consumo_evento', kwargs={'evento_pk': evento.pk}) + '#receta-pane'
+
+
+def copiar_receta(request, pk):
+    """Trae la receta del menú del evento como punto de partida (RN-18)."""
+    evento = get_object_or_404(Evento, pk=pk)
+    destino = reverse('stock:consumo_evento', kwargs={'evento_pk': evento.pk}) + '#receta-pane'
+
+    if request.method != 'POST':
+        return redirect(destino)
+
+    if evento.cerrado:
+        messages.error(request, f'"{evento.nombre}" está cerrado. Reabrilo si necesitás corregirlo.')
+    elif not evento.menu_id:
+        messages.error(request, 'Este evento no tiene un menú asignado, así que no hay receta que copiar.')
+    else:
+        copiadas = evento.copiar_receta_del_menu()
+        if copiadas:
+            messages.success(
+                request,
+                f'Copiamos {copiadas} producto{"s" if copiadas != 1 else ""} de "{evento.menu.nombre}". '
+                'Ajustá lo que haga falta para este evento.',
+            )
+        else:
+            messages.error(request, f'"{evento.menu.nombre}" todavía no tiene productos cargados en su receta.')
+
+    return redirect(destino)
+
+
+# ---------- Cargos al cliente (adicionales facturables) ----------
+class CargoEventoCreateView(CreateView):
+    model = CargoEvento
+    fields = ['concepto', 'monto']
+    template_name = 'stock/cargoevento_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.evento = get_object_or_404(Evento, pk=self.kwargs['evento_pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # El evento antes de validar, para que clean() pueda bloquear si está cerrado.
+        kwargs['instance'] = CargoEvento(evento=self.evento)
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.evento = self.evento
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        next_url = self.request.POST.get('next') or reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+        for errores_del_campo in form.errors.values():
+            for error in errores_del_campo:
+                messages.error(self.request, error)
+        return redirect(next_url)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.evento
+        return context
+
+    def get_success_url(self):
+        return self.request.POST.get('next') or reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+
+
+class CargoEventoUpdateView(UpdateView):
+    model = CargoEvento
+    fields = ['concepto', 'monto']
+    template_name = 'stock/cargoevento_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.object.evento
+        return context
+
+    def get_success_url(self):
+        return reverse('stock:evento_detail', kwargs={'pk': self.object.evento_id})
+
+
+class CargoEventoDeleteView(DeleteView):
+    model = CargoEvento
+    template_name = 'stock/cargoevento_confirm_delete.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.object.evento
+        return context
+
+    def get_success_url(self):
+        return reverse('stock:evento_detail', kwargs={'pk': self.object.evento_id})
+
+
+# ---------- Consumo (MovimientoStock) de un Evento ----------
+class MovimientoStockEnEventoMixin:
+    """Lo que se carga contra un evento es entrada o salida, nunca merma.
+
+    La merma no lleva evento (la valida MovimientoStock.clean), así que si el
+    form la ofreciera, elegirla sería un 500: Django revienta cuando clean()
+    apunta un error a un campo que el form no declara ('motivo').
+    """
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields['tipo'].choices = [
+            (valor, etiqueta)
+            for valor, etiqueta in MovimientoStock.TIPO_CHOICES
+            if valor != 'merma'
+        ]
+        return form
+
+
+class MovimientoStockCreateView(MovimientoStockEnEventoMixin, CreateView):
+    model = MovimientoStock
+    fields = ['producto', 'tipo', 'cantidad']
+    template_name = 'stock/movimientostock_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.evento = get_object_or_404(Evento, pk=self.kwargs['evento_pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # El evento tiene que estar puesto ANTES de validar. Si se asigna recién
+        # en form_valid(), clean() no lo ve y el bloqueo por evento cerrado
+        # (RN-16) nunca se dispararía en el alta.
+        kwargs['instance'] = MovimientoStock(evento=self.evento)
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.evento = self.evento
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        next_url = self.request.POST.get('next') or reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+        for errores_del_campo in form.errors.values():
+            for error in errores_del_campo:
+                messages.error(self.request, error)
+        return redirect(next_url)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.evento
+        return context
+
+    def get_success_url(self):
+        next_url = self.request.POST.get('next')
+        if next_url:
+            return next_url
+        return reverse_lazy('stock:evento_detail', kwargs={'pk': self.evento.pk})
+
+
+def volver_del_movimiento(movimiento):
+    """A dónde se vuelve después de editar o borrar un movimiento.
+
+    Las compras y las mermas NO tienen evento: mandarlas a evento_detail era un
+    AttributeError. Cada una vuelve a la pantalla de donde salió.
+    """
+    if movimiento.evento_id:
+        return reverse('stock:evento_detail', kwargs={'pk': movimiento.evento_id})
+    if movimiento.tipo == 'merma':
+        return reverse('stock:merma')
+    return reverse('stock:compras')
+
+
+class MovimientoStockUpdateView(UpdateView):
+    model = MovimientoStock
+    # 'motivo' va en el form aunque solo lo use la merma: si clean() apunta un
+    # error a un campo que el form no declara, Django tira 500 en vez de
+    # mostrarlo. Acá se editan los tres tipos, así que van los cuatro campos.
+    fields = ['producto', 'tipo', 'cantidad', 'motivo']
+    template_name = 'stock/movimientostock_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.object.evento
+        return context
+
+    def get_success_url(self):
+        return volver_del_movimiento(self.object)
+
+
 class MovimientoStockDeleteView(DeleteView):
     model = MovimientoStock
     template_name = 'stock/movimientostock_confirm_delete.html'
 
     def get_success_url(self):
-        return reverse_lazy('stock:evento_detail', kwargs={'pk': self.object.evento.pk})
+        return volver_del_movimiento(self.object)
     
 # ---------- Paquete ----------
 class PaqueteListView(ListView):
@@ -333,35 +627,77 @@ class MenuDeleteView(DeleteView):
     template_name = 'stock/menu_confirm_delete.html'
     success_url = reverse_lazy('stock:menu_list')
 
-# ---------- Compras (carga de stock por sector, en pestañas) ----------
+# ---------- Compras y merma (movimientos de depósito, por sector) ----------
+
+def productos_por_sector():
+    """Los tres sectores de RN-8, que comparten Compras, Consumo y Merma.
+
+    Solo los activos: un producto dado de baja conserva su historial pero no se
+    puede seguir moviendo (RN-20).
+    """
+    return {
+        f'productos_{sector}': Producto.objects.filter(sector=sector, activo=True).order_by(Lower('nombre'))
+        for sector, _ in SECTOR_CHOICES
+    }
+
 
 def compras(request):
     if request.method == 'POST':
-        producto_id = request.POST.get('producto_id')
-        cantidad = request.POST.get('cantidad')
         tab = request.POST.get('tab', 'barra-pane')
-        producto = get_object_or_404(Producto, pk=producto_id)
-        if cantidad and int(cantidad) > 0:
-            MovimientoStock.objects.create(
-                producto=producto,
-                tipo='entrada',
-                cantidad=int(cantidad),
-            )
-        return redirect(f"{reverse('stock:compras')}#{tab}")
+        destino = f"{reverse('stock:compras')}#{tab}"
+        producto = get_object_or_404(Producto, pk=request.POST.get('producto_id'))
+        cantidad = parsear_cantidad(request.POST.get('cantidad'))
 
-    context = {
-        'productos_barra': Producto.objects.filter(sector='barra').order_by(Lower('nombre')),
-        'productos_cocina': Producto.objects.filter(sector='cocina').order_by(Lower('nombre')),
-        'productos_extras': Producto.objects.filter(sector='extras').order_by(Lower('nombre')),
-    }
-    return render(request, 'stock/compras.html', context)
+        if cantidad is None or cantidad <= 0:
+            messages.error(request, 'Poné una cantidad en números para cargar el stock.')
+            return redirect(destino)
 
-    context = {
-        'productos_barra': Producto.objects.filter(sector='barra').order_by(Lower('nombre')),
-        'productos_cocina': Producto.objects.filter(sector='cocina').order_by(Lower('nombre')),
-        'productos_extras': Producto.objects.filter(sector='extras').order_by(Lower('nombre')),
-    }
-    return render(request, 'stock/compras.html', context)
+        MovimientoStock.objects.create(producto=producto, tipo='entrada', cantidad=cantidad)
+        return redirect(destino)
+
+    return render(request, 'stock/compras.html', productos_por_sector())
+
+
+def merma(request):
+    """Salidas que no son de ningún evento: rotura, vencimiento, consumo interno.
+
+    Antes esto no existía y la única forma de descontar era cargarlo a un evento
+    (que le inflaba el costo) o editar el stock a mano (que rompía el libro mayor).
+    """
+    if request.method == 'POST':
+        tab = request.POST.get('tab', 'barra-pane')
+        destino = f"{reverse('stock:merma')}#{tab}"
+        producto = get_object_or_404(Producto, pk=request.POST.get('producto_id'))
+        cantidad = parsear_cantidad(request.POST.get('cantidad'))
+
+        if cantidad is None or cantidad <= 0:
+            messages.error(request, 'Poné una cantidad en números para registrar la merma.')
+            return redirect(destino)
+
+        movimiento = MovimientoStock(
+            producto=producto,
+            tipo='merma',
+            motivo=request.POST.get('motivo', ''),
+            cantidad=cantidad,
+        )
+        try:
+            movimiento.full_clean()
+        except ValidationError as error:
+            for errores_del_campo in error.message_dict.values():
+                for mensaje in errores_del_campo:
+                    messages.error(request, mensaje)
+            return redirect(destino)
+
+        movimiento.save()
+        messages.success(
+            request,
+            f'Registramos la merma de {cantidad} {producto.unidad_medida} de {producto.nombre}.',
+        )
+        return redirect(destino)
+
+    context = productos_por_sector()
+    context['motivos'] = MovimientoStock.MOTIVO_CHOICES
+    return render(request, 'stock/merma.html', context)
 
 # ---------- Calendario de eventos ----------
 def obtener_datos_calendario(year=None, month=None):
@@ -421,18 +757,41 @@ def calendario_eventos(request):
     return render(request, 'stock/calendario.html', context)
 
 # ---------- Consumo (pantalla dedicada por evento) ----------
+def reabrir_evento(request, pk):
+    """RN-16: la puerta de salida del congelamiento, con rastro."""
+    evento = get_object_or_404(Evento, pk=pk)
+    if request.method == 'POST':
+        if evento.reabrir():
+            messages.success(
+                request,
+                f'Reabrimos "{evento.nombre}". Acordate de volver a finalizarlo cuando termines de corregir.',
+            )
+        else:
+            messages.error(request, f'"{evento.nombre}" no está finalizado, así que no hay nada que reabrir.')
+    return redirect('stock:evento_detail', pk=evento.pk)
+
+
 def consumo_selector(request):
-    eventos = Evento.objects.order_by('-fecha')
+    # Los finalizados quedan afuera: sus números están cerrados (RN-16). Para
+    # corregir uno hay que reabrirlo desde su detalle.
+    eventos = Evento.objects.exclude(estado='finalizado').order_by('-fecha')
     return render(request, 'stock/consumo_selector.html', {'eventos': eventos})
 
 
 def consumo_evento(request, evento_pk):
     evento = get_object_or_404(Evento, pk=evento_pk)
-    context = {
-        'evento': evento,
-        'productos_barra': Producto.objects.filter(sector='barra').order_by(Lower('nombre')),
-        'productos_cocina': Producto.objects.filter(sector='cocina').order_by(Lower('nombre')),
-        'productos_extras': Producto.objects.filter(sector='extras').order_by(Lower('nombre')),
-        'empleados': Empleado.objects.all().order_by('nombre'),
-    }
+
+    # RN-19: la receta no descuenta nada, solo sugiere. Se le cuelga la cantidad
+    # a cada producto para que el input aparezca precargado y el usuario corrija.
+    sugerido = {item['producto'].pk: item['cantidad'] for item in evento.consumo_sugerido}
+
+    context = productos_por_sector()
+    for sector, _ in SECTOR_CHOICES:
+        productos = list(context[f'productos_{sector}'])
+        for producto in productos:
+            producto.sugerido = sugerido.get(producto.pk)
+        context[f'productos_{sector}'] = productos
+
+    context['evento'] = evento
+    context['empleados'] = Empleado.objects.all().order_by('nombre')
     return render(request, 'stock/consumo_evento.html', context)

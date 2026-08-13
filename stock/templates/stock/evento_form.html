@@ -1,10 +1,73 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>{% if object %}Editar evento{% else %}Nuevo evento{% endif %}</h1>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Guardar</button>
-    <a href="{% url 'stock:evento_list' %}" class="btn-accion btn-volver">Cancelar</a>
-</form>
+
+<div class="w-full max-w-2xl mx-auto flex flex-col gap-stack-lg">
+
+  <!-- ===================== Cabecera ===================== -->
+  <div class="flex flex-col gap-stack-sm">
+    <a href="{% url 'stock:evento_list' %}"
+       class="inline-flex items-center gap-unit w-fit text-on-surface-med hover:text-primary transition-colors font-label-md text-label-md uppercase tracking-wider">
+      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+      <span>Volver a Eventos</span>
+    </a>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar evento{% else %}Nuevo evento{% endif %}</h1>
+    <p class="font-body-md text-body-md text-on-surface-med">
+      {% if object %}Actualizá los datos del evento y guardá.{% else %}Completá los datos del evento y guardá.{% endif %}
+    </p>
+  </div>
+
+  <!-- ===================== Tarjeta del formulario ===================== -->
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full [&_select]:w-full [&_textarea]:w-full [&_textarea]:min-h-[120px] [&_textarea]:resize-y">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <p class="font-body-sm text-body-sm text-error">{{ form.non_field_errors|striptags }}</p>
+      {% endif %}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+        {% for field in form %}
+        <div class="flex flex-col gap-unit{% if field.name == 'nombre' or field.name == 'notas' %} md:col-span-2{% endif %}">
+
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ field.id_for_label }}">
+            {% if field.name == 'menu' %}Menú{% else %}{{ field.label }}{% endif %}
+          </label>
+
+          {% if field.name == 'fecha' %}
+          <input type="date" name="{{ field.html_name }}" id="{{ field.id_for_label }}"
+                 value="{{ field.value|date:'Y-m-d'|default:field.value|default:'' }}"
+                 {% if field.field.required %}required{% endif %}
+                 class="font-body-md text-body-md">
+          {% else %}
+          {{ field }}
+          {% endif %}
+
+          {% if field.help_text %}
+          <p class="font-body-sm text-body-sm text-on-surface-med">{{ field.help_text }}</p>
+          {% endif %}
+
+          {% if field.errors %}
+          <p class="font-body-sm text-body-sm text-error">{{ field.errors|striptags }}</p>
+          {% endif %}
+
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+        <a href="{% url 'stock:evento_list' %}"
+           class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+          Cancelar
+        </a>
+        <button type="submit"
+                class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+          <span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
 {% endblock %}

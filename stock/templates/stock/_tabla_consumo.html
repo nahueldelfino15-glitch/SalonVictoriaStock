@@ -1,27 +1,47 @@
-<div class="tabla-wrapper">
-<table class="table align-middle">
-    <thead>
-        <tr><th>Producto</th><th class="text-end">Stock actual</th><th>Consumir</th></tr>
-    </thead>
-    <tbody>
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Producto</th>
+          <th class="px-stack-md py-4 font-semibold">Stock disponible</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Consumir</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
         {% for producto in productos %}
-        <tr>
-            <td>{{ producto.nombre }}</td>
-            <td class="text-end">{{ producto.stock_actual }} {{ producto.unidad_medida }}</td>
-            <td>
-                <form method="post" action="{% url 'stock:movimientostock_create' evento.pk %}" class="d-flex gap-2">
-                    {% csrf_token %}
-                    <input type="hidden" name="producto" value="{{ producto.pk }}">
-                    <input type="hidden" name="tipo" value="salida">
-                    <input type="hidden" name="next" value="{% url 'stock:consumo_evento' evento.pk %}#{{ tab_id }}">
-                    <input type="number" name="cantidad" min="1" class="form-control form-control-sm" style="width:100px" placeholder="Cant." required>
-                    <button type="submit" class="btn btn-sm btn-vino">+ Agregar</button>
-                </form>
-            </td>
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">{{ producto.nombre }}</td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ producto.stock_actual }} {{ producto.unidad_medida }}</td>
+          <td class="px-stack-md py-4 text-right">
+            <form method="post" action="{% url 'stock:movimientostock_create' evento.pk %}" class="flex items-center justify-end gap-stack-sm">
+              {% csrf_token %}
+              <input type="hidden" name="producto" value="{{ producto.pk }}">
+              <input type="hidden" name="tipo" value="salida">
+              <input type="hidden" name="next" value="{% url 'stock:consumo_evento' evento.pk %}#{{ tab_id }}">
+              <label class="sr-only" for="cantidad-{{ tab_id }}-{{ producto.pk }}">Cantidad a consumir de {{ producto.nombre }}</label>
+              <input type="number" name="cantidad" id="cantidad-{{ tab_id }}-{{ producto.pk }}" step="0.01" min="0.01" placeholder="Cant." required
+                     {% if producto.sugerido %}value="{{ producto.sugerido }}" title="Sugerido por la receta del evento"{% endif %}
+                     class="!w-20 !bg-surface-base !border !border-solid !border-outline-variant !rounded !px-2 !py-1 text-center font-body-sm text-body-sm">
+              <button type="submit"
+                      class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+                <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar</span>
+              </button>
+            </form>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="3">No hay productos cargados en este sector.</td></tr>
+        <tr>
+          <td colspan="3" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inbox</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay productos cargados en este sector.</p>
+          </td>
+        </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ productos|length }} producto{{ productos|length|pluralize }}</span>
+  </div>
 </div>

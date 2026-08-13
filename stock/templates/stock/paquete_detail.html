@@ -1,13 +1,44 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>{{ paquete.nombre }}</h1>
-<ul class="list-group mb-3">
-    <li class="list-group-item"><strong>Descripción:</strong> {{ paquete.descripcion|default:"—" }}</li>
-    <li class="list-group-item"><strong>Precio:</strong> {% if paquete.precio %}${{ paquete.precio }}{% else %}—{% endif %}</li>
-</ul>
-<div class="acciones-fila">
-    <a href="{% url 'stock:paquete_update' paquete.pk %}" class="btn-accion btn-editar">Editar</a>
-    <a href="{% url 'stock:paquete_delete' paquete.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
-    <a href="{% url 'stock:paquete_list' %}" class="btn-accion btn-volver">Volver</a>
+
+<!-- ============================ Header ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div class="flex items-center gap-stack-md min-w-0">
+    <span class="w-12 h-12 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-headline-sm text-headline-sm uppercase">{% with palabras=paquete.nombre.split %}{{ palabras.0|first|upper }}{% if palabras.1 %}{{ palabras.1|first|upper }}{% endif %}{% endwith %}</span>
+    <div class="min-w-0">
+      <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{{ paquete.nombre }}</h1>
+      <p class="font-body-md text-body-md text-on-surface-med">Detalle del paquete</p>
+    </div>
+  </div>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <a href="{% url 'stock:paquete_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">arrow_back</span><span>Volver</span>
+    </a>
+    <a href="{% url 'stock:paquete_update' paquete.pk %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">edit</span><span>Editar</span>
+    </a>
+  </div>
+</header>
+
+<!-- ============================ Datos ============================ -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+  <div class="md:col-span-2 bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Descripción</p>
+    <p class="font-body-md text-body-md text-on-surface mt-stack-sm whitespace-pre-line">{{ paquete.descripcion|default:"—" }}</p>
+  </div>
+
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Precio</p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">{% if paquete.precio %}$ {{ paquete.precio|floatformat:2 }}{% else %}—{% endif %}</p>
+  </div>
 </div>
+
+<!-- ============================ Peligro ============================ -->
+<div class="flex justify-end">
+  <a href="{% url 'stock:paquete_delete' paquete.pk %}"
+     class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">delete</span><span>Eliminar paquete</span>
+  </a>
+</div>
+
 {% endblock %}

@@ -3,12 +3,12 @@
 
 <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
   <div>
-    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Compras</h1>
-    <p class="font-body-md text-body-md text-on-surface-med mt-unit">Cargá lo que entra al depósito: cada carga suma stock al producto.</p>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Merma</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">Lo que se perdió sin llegar a un evento: roturas, vencimientos y consumo interno. Descuenta stock, pero no le suma gasto a ningún evento.</p>
   </div>
   <div class="flex items-center gap-stack-sm text-on-surface-med font-body-sm text-body-sm">
-    <span class="material-symbols-outlined text-[20px] text-primary">shopping_cart</span>
-    <span>Reposición sin evento</span>
+    <span class="material-symbols-outlined text-[20px] text-primary">delete_sweep</span>
+    <span>Pérdida de depósito</span>
   </div>
 </header>
 
@@ -23,15 +23,15 @@
 </div>
 
 <div id="barra-pane" data-tab-panel role="tabpanel" aria-labelledby="barra-tab">
-  {% include 'stock/_tabla_compras.html' with productos=productos_barra tab_id='barra-pane' %}
+  {% include 'stock/_tabla_merma.html' with productos=productos_barra tab_id='barra-pane' motivos=motivos %}
 </div>
 
 <div id="cocina-pane" data-tab-panel role="tabpanel" aria-labelledby="cocina-tab" class="hidden">
-  {% include 'stock/_tabla_compras.html' with productos=productos_cocina tab_id='cocina-pane' %}
+  {% include 'stock/_tabla_merma.html' with productos=productos_cocina tab_id='cocina-pane' motivos=motivos %}
 </div>
 
 <div id="extras-pane" data-tab-panel role="tabpanel" aria-labelledby="extras-tab" class="hidden">
-  {% include 'stock/_tabla_compras.html' with productos=productos_extras tab_id='extras-pane' %}
+  {% include 'stock/_tabla_merma.html' with productos=productos_extras tab_id='extras-pane' motivos=motivos %}
 </div>
 
 {% endblock %}

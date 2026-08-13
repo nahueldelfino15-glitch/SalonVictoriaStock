@@ -1,10 +1,22 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>Eliminar menú</h1>
-<p>¿Seguro que querés eliminar <strong>{{ menu.nombre }}</strong>?</p>
-<form method="post">
+
+<div class="w-full max-w-lg mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg text-center">
+  <span class="material-symbols-outlined text-error text-[40px]">warning</span>
+
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">Eliminar menú</h1>
+  <p class="font-body-md text-body-md text-on-surface-med mt-stack-sm">
+    ¿Seguro que querés eliminar <strong class="text-on-surface-high">{{ menu.nombre }}</strong>?
+    Los eventos que lo tengan asignado van a quedar sin menú.
+  </p>
+
+  <form method="post" class="flex flex-col sm:flex-row justify-center gap-stack-md mt-stack-lg pt-stack-md border-t border-surface-variant">
     {% csrf_token %}
-    <button type="submit" class="btn-accion btn-eliminar">Sí, eliminar</button>
-    <a href="{% url 'stock:menu_list' %}" class="btn-accion btn-volver">Cancelar</a>
-</form>
+    <a href="{% url 'stock:menu_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+    <button type="submit" class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">delete</span><span>Sí, eliminar</span>
+    </button>
+  </form>
+</div>
+
 {% endblock %}

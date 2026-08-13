@@ -1,316 +1,561 @@
- {% load static %}
+{% load static %}
 <!DOCTYPE html>
-<html lang="es">
+<html class="dark" lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="format-detection" content="telephone=no">
-    <link rel="icon" type="image/png" href="/static/stock/img/LogoVictoria.png">
-    <title>Control de Stock - Salón Victoria</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no">
+<title>Control de Stock - Salón Victoria</title>
+<link rel="icon" type="image/png" href="{% static 'stock/img/LogoVictoria.png' %}">
+
+<!-- ========================= Fuentes ========================= -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+<!-- ========================= Tailwind CDN ========================= -->
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          /* --- Superficies Material (tono cálido / oliva oscuro) --- */
+          "surface": "#16130b",
+          "surface-dim": "#16130b",
+          "surface-bright": "#3d392f",
+          "surface-container-lowest": "#110e07",
+          "surface-container-low": "#1f1b13",
+          "surface-container": "#231f17",
+          "surface-container-high": "#2d2a21",
+          "surface-container-highest": "#38342b",
+          "surface-variant": "#38342b",
+          "background": "#16130b",
+
+          /* --- Superficies "Noir Luxury" (negro puro) --- */
+          "surface-base": "#0a0a0a",
+          "surface-raised": "#161616",
+          "surface-overlay": "#242424",
+
+          /* --- Texto --- */
+          "on-surface": "#eae1d4",
+          "on-surface-variant": "#d0c5af",
+          "on-background": "#eae1d4",
+          "on-surface-high": "#ffffff",
+          "on-surface-med": "#a1a1a1",
+          "inverse-surface": "#eae1d4",
+          "inverse-on-surface": "#343027",
+
+          /* --- Bordes --- */
+          "outline": "#99907c",
+          "outline-variant": "#4d4635",
+
+          /* --- Oro (marca) --- */
+          "surface-tint": "#e9c349",
+          "primary": "#f2ca50",
+          "on-primary": "#3c2f00",
+          "primary-container": "#d4af37",
+          "on-primary-container": "#554300",
+          "inverse-primary": "#735c00",
+          "primary-fixed": "#ffe088",
+          "primary-fixed-dim": "#e9c349",
+          "on-primary-fixed": "#241a00",
+          "on-primary-fixed-variant": "#574500",
+          "gold-muted": "#735c00",
+
+          /* --- Secundario (grises) --- */
+          "secondary": "#c7c6c6",
+          "on-secondary": "#303030",
+          "secondary-container": "#464747",
+          "on-secondary-container": "#b6b5b4",
+          "secondary-fixed": "#e3e2e2",
+          "secondary-fixed-dim": "#c7c6c6",
+          "on-secondary-fixed": "#1b1c1c",
+          "on-secondary-fixed-variant": "#464747",
+
+          /* --- Terciario (azules) --- */
+          "tertiary": "#bfcdff",
+          "on-tertiary": "#082b72",
+          "tertiary-container": "#97b0ff",
+          "on-tertiary-container": "#254188",
+          "tertiary-fixed": "#dbe1ff",
+          "tertiary-fixed-dim": "#b4c5ff",
+          "on-tertiary-fixed": "#00174b",
+          "on-tertiary-fixed-variant": "#27438a",
+
+          /* --- Error --- */
+          "error": "#ffb4ab",
+          "on-error": "#690005",
+          "error-container": "#93000a",
+          "on-error-container": "#ffdad6"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem",
+          "pill": "9999px"
+        },
+        "spacing": {
+          "unit": "4px",
+          "stack-sm": "8px",
+          "stack-md": "16px",
+          "stack-lg": "24px",
+          "gutter": "24px",
+          "container-padding": "32px"
+        },
+        "fontFamily": {
+          "display-lg": ["Hanken Grotesk"],
+          "headline-lg": ["Hanken Grotesk"],
+          "headline-lg-mobile": ["Hanken Grotesk"],
+          "headline-md": ["Hanken Grotesk"],
+          "headline-sm": ["Hanken Grotesk"],
+          "body-lg": ["Hanken Grotesk"],
+          "body-md": ["Hanken Grotesk"],
+          "body-sm": ["Hanken Grotesk"],
+          "label-md": ["Hanken Grotesk"]
+        },
+        "fontSize": {
+          "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+          "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+          "headline-lg-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "600" }],
+          "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+          "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "500" }],
+          "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+          "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+          "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+          "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+        }
+      }
+    }
+  }
+</script>
+
 <style>
+  /* ==========================================================================
+     Victoria · Noir Luxury — clases utilitarias custom
+     Todo resuelto a hex literal: el CDN de Tailwind NO procesa theme() dentro
+     de un <style> plano.
+     Los selectores de formulario van prefijados con `html` a propósito: así le
+     ganan por especificidad al reset del plugin `forms` (que el CDN inyecta
+     DESPUÉS de este bloque). Para pisarlos desde una pantalla, usar el
+     modificador important de Tailwind: !bg-surface-base, !w-16, !border, etc.
+     ========================================================================== */
 
-    .acciones-fila { display: flex; gap: .4rem; flex-wrap: wrap; }
-    .btn-accion { min-width: 76px; text-align: center; }
-    .text-end { text-align: right; }
-:root {
-        --vino: #141414;
-        --vino-claro: #2c2c2c;
-        --dorado: #d4a017;
-        --dorado-suave: #f3e2b3;
-        --crema: #faf8f5;
-        --texto: #1a1a1a;
-        --gris: #8a8a8a;
-    }
+  body { font-family: 'Hanken Grotesk', sans-serif; }
 
-    body { font-family: 'Inter', sans-serif; background: var(--crema); color: var(--texto); }
-    h1, h2, h3, .cal-titulo { font-family: 'Fraunces', serif; }
+  /* --- Material Symbols -------------------------------------------------- */
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .material-symbols-outlined.fill {
+    font-variation-settings: 'FILL' 1;
+  }
 
-    .calendario-wrapper {
-        background: #fff;
-        border-radius: 20px;
-        padding: 2rem;
-        box-shadow: 0 10px 30px rgba(74, 25, 66, 0.08);
-    }
+  /* --- Sombra ambiental de la barra superior ----------------------------- */
+  .ambient-shadow {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+  }
 
-    .calendario-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 1.5rem;
-    }
+  /* --- Form Element Styling overrides for the dark luxury theme ---------- */
+  html input[type="text"],
+  html input[type="number"],
+  html input[type="date"],
+  html input[type="search"],
+  html input[type="tel"],
+  html input[type="email"],
+  html input[type="password"],
+  html input[type="url"],
+  html input[type="datetime-local"],
+  html select,
+  html textarea {
+    background-color: #161616;               /* colors.surface-raised   */
+    border: none;
+    border-bottom: 1px solid #38342b;        /* colors.surface-variant  */
+    color: #ffffff;                          /* colors.on-surface-high  */
+    border-radius: 0.125rem 0.125rem 0 0;    /* borderRadius.DEFAULT    */
+    padding: 8px 16px;                       /* spacing.stack-sm / .stack-md */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
 
-    .cal-titulo { font-size: 1.8rem; font-weight: 700; color: var(--vino); margin: 0; }
-    .cal-anio { color: var(--dorado); font-weight: 600; }
+  html input[type="text"]:focus,
+  html input[type="number"]:focus,
+  html input[type="date"]:focus,
+  html input[type="search"]:focus,
+  html input[type="tel"]:focus,
+  html input[type="email"]:focus,
+  html input[type="password"]:focus,
+  html input[type="url"]:focus,
+  html input[type="datetime-local"]:focus,
+  html select:focus,
+  html textarea:focus {
+    outline: none;
+    border-bottom-color: #f2ca50;            /* colors.primary          */
+    box-shadow: 0 1px 0 0 #f2ca50;           /* colors.primary          */
+    background-color: #242424;               /* colors.surface-overlay  */
+  }
 
-    .cal-nav {
-        width: 40px; height: 40px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        background: var(--crema); color: var(--vino); text-decoration: none;
-        font-size: 1.3rem; transition: all .2s;
-    }
-    .cal-nav:hover { background: var(--vino); color: #fff; }
+  html input::placeholder,
+  html textarea::placeholder { color: #a1a1a1; }   /* colors.on-surface-med */
 
-    .calendario-grid {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 6px;
-    }
+  html select option { background-color: #161616; color: #ffffff; }
 
-    .cal-diasemana {
-        text-align: center; font-size: .75rem; font-weight: 600; letter-spacing: .08em;
-        text-transform: uppercase; color: var(--gris); padding-bottom: .5rem;
-    }
+  /* Customize date picker icon color for dark mode */
+  ::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.7);
+  }
 
-    .cal-dia {
-        min-height: 90px; border-radius: 12px; padding: .5rem;
-        background: var(--crema); transition: background .2s;
-    }
-    .cal-dia:hover { background: var(--dorado-suave); }
-    .cal-vacio { background: transparent; }
+  /* --- Botones ----------------------------------------------------------- */
+  .luxury-button-primary {
+    background-color: #f2ca50;               /* colors.primary          */
+    color: #0a0a0a;                          /* colors.surface-base     */
+    transition: all 0.2s ease;
+  }
+  .luxury-button-primary:hover {
+    background-color: #e9c349;               /* colors.primary-fixed-dim */
+    transform: translateY(-1px);
+  }
 
-    .cal-numero {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 26px; height: 26px; font-weight: 600; font-size: .85rem;
-        border-radius: 50%;
-    }
+  .luxury-button-secondary {
+    background-color: transparent;
+    color: #ffffff;                          /* colors.on-surface-high  */
+    border: 1px solid #38342b;               /* colors.surface-variant  */
+    transition: all 0.2s ease;
+  }
+  .luxury-button-secondary:hover {
+    border-color: #f2ca50;                   /* colors.primary          */
+    color: #f2ca50;
+  }
 
-    .cal-hoy { box-shadow: inset 0 0 0 2px var(--dorado); background: #fff; }
-    .cal-hoy .cal-numero { background: var(--dorado); color: #fff; }
-
-    .cal-evento {
-        display: block; margin-top: .35rem; font-size: .7rem; padding: .2rem .4rem;
-        background: var(--vino); color: #fff; border-radius: 6px;
-        text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .cal-evento:hover { background: var(--vino-claro); color: #fff; }
-
-    @media (max-width: 576px) {
-        .cal-dia { min-height: 60px; padding: .3rem; }
-        .cal-evento { font-size: .6rem; }
-        .cal-titulo { font-size: 1.3rem; }
-    }
-    .panel-btn {
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: .5rem; height: 100%;
-        background: var(--vino); color: #fff;
-        border-radius: 16px; padding: 1.8rem 1rem;
-        text-decoration: none;
-        font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.1rem;
-        box-shadow: 0 6px 20px rgba(74, 25, 66, 0.15);
-        transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
-        position: relative; overflow: hidden;
-    }
-    .panel-btn:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 28px rgba(74, 25, 66, 0.25);
-        background: var(--vino-claro);
-        color: #fff;
-    }
-    .panel-btn::after {
-        content: '';
-        position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-        width: 0; height: 3px; background: var(--dorado);
-        transition: width .3s ease;
-    }
-    .panel-btn:hover::after { width: 60%; }
-    .panel-icono { font-size: 1.8rem; }
-
-    .btn-vino { background: var(--vino); color: #fff; border: none; }
-    .btn-vino:hover { background: var(--vino-claro); color: #fff; }
-
-    .eventos-lista {
-        background: #fff; border-radius: 20px; padding: .75rem;
-        box-shadow: 0 10px 30px rgba(74, 25, 66, 0.08);
-    }
-    .evento-fila {
-        display: flex; align-items: center; gap: 1rem;
-        padding: .75rem 1rem; border-radius: 12px;
-        text-decoration: none; color: var(--texto);
-        transition: background .2s;
-    }
-    .evento-fila:hover { background: var(--crema); }
-    .evento-fecha {
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: var(--vino); color: #fff; border-radius: 10px;
-        width: 50px; height: 50px; flex-shrink: 0;
-    }
-    .evento-fecha .num { font-size: 1.1rem; font-weight: 700; line-height: 1; font-family: 'Fraunces', serif; }
-    .evento-fecha .mes { font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; }
-    .evento-nombre { font-weight: 600; flex: 1; }
-    .evento-vacio { color: var(--gris); padding: 1rem; text-align: center; }
-
-    .navbar-vino {
-        background: var(--vino);
-        padding: 1rem 0;
-        margin-bottom: 2rem;
-    }
-    .navbar-vino .navbar-brand {
-        font-family: 'Fraunces', serif;
-        font-weight: 700;
-        font-size: 1.4rem;
-        color: #fff !important;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        gap: .6rem;
-    }
-    .navbar-vino .navbar-brand img {
-        height: 55px;
-        width: auto;
-    }
-    .navbar-vino .navbar-brand:hover { color: var(--dorado-suave) !important; }
-
-    .nav-link-vino {
-        color: rgba(255, 255, 255, 0.85) !important;
-        text-decoration: none;
-        padding: .4rem .9rem;
-        border-radius: 20px;
-        font-size: .9rem;
-        font-weight: 500;
-        transition: all .2s ease;
-        display: inline-block;
-    }
-    .nav-link-vino:hover {
-        background: rgba(255, 255, 255, 0.15);
-        color: #fff !important;
-    }
-
-    .nav-link-admin {
-        color: var(--dorado) !important;
-        border: 1px solid var(--dorado);
-        padding: .35rem .9rem;
-        border-radius: 20px;
-        font-size: .85rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition: all .2s ease;
-    }
-    .nav-link-admin:hover {
-        background: var(--dorado);
-        color: var(--vino) !important;
-    }
-    .btn-accion {
-        display: inline-block;
-        padding: .45rem 1rem;
-        border-radius: 20px;
-        font-size: .85rem;
-        font-weight: 600;
-        text-decoration: none;
-        border: 1.5px solid transparent;
-        transition: all .2s ease;
-    }
-    .btn-ver { color: var(--vino); border-color: var(--vino); }
-    .btn-ver:hover { background: var(--vino); color: #fff; }
-
-    .btn-editar { color: var(--dorado); border-color: var(--dorado); }
-    .btn-editar:hover { background: var(--dorado); color: #fff; }
-
-    .btn-eliminar { color: #b23a48; border-color: #b23a48; }
-    .btn-eliminar:hover { background: #b23a48; color: #fff; }
-
-    .btn-volver { color: var(--gris); border-color: var(--gris); }
-    .btn-volver:hover { background: var(--gris); color: #fff; }
-
-    .tabla-wrapper {
-        background: #fff;
-        border-radius: 20px;
-        padding: 1.25rem;
-        box-shadow: 0 10px 30px rgba(20, 20, 20, 0.08);
-        margin-bottom: 1.5rem;
-        overflow-x: auto;
-    }
-    .tabla-wrapper table { margin-bottom: 0; }
-    .tabla-wrapper thead th {
-        border: none;
-        color: var(--gris);
-        text-transform: uppercase;
-        font-size: .75rem;
-        letter-spacing: .05em;
-        font-weight: 600;
-        padding-bottom: .75rem;
-    }
-    .tabla-wrapper tbody td {
-        border-top: 1px solid #f0ece6;
-        vertical-align: middle;
-        padding: .75rem .5rem;
-    }
-    .tabla-wrapper tbody tr:hover { background: var(--crema); }
-    .buscador {
-        display: flex; align-items: center; gap: .5rem;
-        background: #fff; border-radius: 24px;
-        padding: .4rem .5rem .4rem 1.2rem;
-        box-shadow: 0 4px 14px rgba(20, 20, 20, 0.06);
-        margin-bottom: 1.5rem;
-        max-width: 420px;
-    }
-    .buscador input {
-        border: none; outline: none; flex: 1;
-        font-family: 'Inter', sans-serif; font-size: .9rem; background: transparent;
-    }
-    .buscador button {
-        background: var(--vino); color: #fff; border: none; border-radius: 50%;
-        width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-        cursor: pointer; transition: background .2s; flex-shrink: 0; font-size: .9rem;
-    }
-    .buscador button:hover { background: var(--vino-claro); }
-    
+  /* --- Scrollbar noir ---------------------------------------------------- */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #242424; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4d4635; }
 </style>
 </head>
-<body>
-<nav class="navbar-vino">
-        <div class="container d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <a class="navbar-brand mb-0" href="{% url 'stock:home' %}">
-                <img src="{% static 'stock/img/LogoVictoria.png' %}" alt="Logo">
-                Salón - Control General
-            </a>
-            <div class="d-flex flex-wrap align-items-center gap-1">
-                <a class="nav-link-vino" href="{% url 'stock:producto_list' %}">Productos</a>
-                <a class="nav-link-vino" href="{% url 'stock:evento_list' %}">Eventos</a>
-                <a class="nav-link-vino" href="{% url 'stock:empleado_list' %}">Personal</a>
-                <a class="nav-link-vino" href="{% url 'stock:calendario' %}">Calendario</a>
-                <a class="nav-link-vino" href="{% url 'stock:paquete_list' %}">Paquetes</a>
-                <a class="nav-link-vino" href="{% url 'stock:menu_list' %}">Menús</a>
-                <a class="nav-link-vino" href="{% url 'stock:compras' %}">Compras</a>
-                <a class="nav-link-vino" href="{% url 'stock:consumo_selector' %}">Consumo</a>
-                <a class="nav-link-admin" href="/admin/">Admin</a>
-            </div>
-        </div>
-    </nav>
-    <div class="container">
 
-{% if messages %}
-    <div class="modal fade" id="mensajeModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Aviso</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    {% for message in messages %}
-                    <p class="mb-1 {% if 'error' in message.tags %}text-danger{% elif 'success' in message.tags %}text-success{% endif %}">{{ message }}</p>
-                    {% endfor %}
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-vino" data-bs-dismiss="modal">Entendido</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var modalEl = document.getElementById('mensajeModal');
-            if (modalEl) {
-                var modal = new bootstrap.Modal(modalEl);
-                modal.show();
-            }
-        });
-    </script>
+<body class="bg-surface-base text-on-surface font-body-md text-body-md min-h-screen selection:bg-primary-container selection:text-on-primary-container">
+
+{% comment %}
+El nombre de ruta se resuelve en su propio {% templatetag openblock %} with {% templatetag closeblock %} A PROPÓSITO: como argumento de
+`add` (add:request.resolver_match.url_name) Django NO atrapa el fallo de lookup y
+revienta el render entero cuando resolver_match es None (páginas de error, RequestFactory).
+Acá el fallo sí cae en string_if_invalid ('') y el default lo convierte en un valor que
+no matchea ninguna lista — si quedara vacío, '' in '|producto_list|...' es True y se
+prendería TODO el nav.
+{% endcomment %}
+{% with nombre_ruta=request.resolver_match.url_name|default:"__sin_ruta__" %}
+{% with un="|"|add:nombre_ruta|add:"|" %}
+{% with cls_on="h-full flex items-center border-b-2 border-primary text-primary font-bold transition-colors duration-200 whitespace-nowrap" cls_off="h-full flex items-center border-b-2 border-transparent text-secondary hover:text-primary transition-colors duration-200 whitespace-nowrap" cls_mon="block px-stack-md py-3 border-l-2 border-primary text-primary font-bold bg-surface-container-low" cls_moff="block px-stack-md py-3 border-l-2 border-transparent text-secondary hover:text-primary hover:bg-surface-container-low transition-colors" %}
+
+<!-- ============================ TopNavBar ============================ -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center gap-stack-md px-stack-md lg:px-container-padding h-20 bg-surface-container-lowest border-b border-outline-variant ambient-shadow">
+
+  <a class="flex items-center gap-stack-sm lg:gap-stack-md shrink-0 group" href="{% url 'stock:home' %}">
+    <img alt="Salón Victoria" class="h-10 w-auto object-contain" src="{% static 'stock/img/LogoVictoria.png' %}">
+    <span class="font-display-lg text-[22px] lg:text-display-lg font-semibold leading-none text-on-background group-hover:text-primary transition-colors">Victoria</span>
+  </a>
+
+  <!-- Nav escritorio -->
+  <nav class="hidden md:flex items-center gap-stack-sm lg:gap-gutter h-full font-body-sm text-body-sm lg:text-body-md">
+    <a class="{% if un in '|producto_list|producto_detail|producto_create|producto_update|producto_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:producto_list' %}">Productos</a>
+    <a class="{% if un in '|evento_list|evento_detail|evento_create|evento_update|evento_delete|evento_historial|personalevento_create|personalevento_update|personalevento_delete|movimientostock_create|movimientostock_update|movimientostock_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:evento_list' %}">Eventos</a>
+    <a class="{% if un in '|empleado_list|empleado_detail|empleado_create|empleado_update|empleado_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:empleado_list' %}">Personal</a>
+    <a class="{% if un in '|calendario|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:calendario' %}">Calendario</a>
+    <a class="{% if un in '|paquete_list|paquete_detail|paquete_create|paquete_update|paquete_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:paquete_list' %}">Paquetes</a>
+    <a class="{% if un in '|menu_list|menu_detail|menu_create|menu_update|menu_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:menu_list' %}">Menús</a>
+    <a class="{% if un in '|compras|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:compras' %}">Compras</a>
+    <a class="{% if un in '|merma|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:merma' %}">Merma</a>
+    <a class="{% if un in '|consumo_selector|consumo_evento|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:consumo_selector' %}">Consumo</a>
+    <a class="{{ cls_off }}" href="/admin/">Admin</a>
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'stock:logout' %}" class="flex items-center ml-stack-sm pl-stack-sm border-l border-outline-variant">
+      {% csrf_token %}
+      <button type="submit" title="Salir ({{ user.get_username }})" aria-label="Cerrar sesión"
+              class="inline-flex items-center gap-unit text-on-surface-med hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[20px]">logout</span>
+      </button>
+    </form>
     {% endif %}
+  </nav>
 
-        {% block content %}{% endblock %}
+  <!-- Hamburguesa (mobile) -->
+  <button type="button" id="navToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navMobile"
+          class="md:hidden shrink-0 p-unit text-secondary hover:text-primary transition-colors rounded-pill hover:bg-surface-container-low">
+    <span class="material-symbols-outlined" id="navToggleIcon">menu</span>
+  </button>
+</header>
+
+<!-- Nav mobile -->
+<nav id="navMobile" class="hidden md:hidden fixed top-20 left-0 w-full z-40 bg-surface-container-lowest border-b border-outline-variant max-h-[calc(100vh-5rem)] overflow-y-auto font-body-md text-body-md">
+  <a class="{% if un in '|producto_list|producto_detail|producto_create|producto_update|producto_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:producto_list' %}">Productos</a>
+  <a class="{% if un in '|evento_list|evento_detail|evento_create|evento_update|evento_delete|evento_historial|personalevento_create|personalevento_update|personalevento_delete|movimientostock_create|movimientostock_update|movimientostock_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:evento_list' %}">Eventos</a>
+  <a class="{% if un in '|empleado_list|empleado_detail|empleado_create|empleado_update|empleado_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:empleado_list' %}">Personal</a>
+  <a class="{% if un in '|calendario|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:calendario' %}">Calendario</a>
+  <a class="{% if un in '|paquete_list|paquete_detail|paquete_create|paquete_update|paquete_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:paquete_list' %}">Paquetes</a>
+  <a class="{% if un in '|menu_list|menu_detail|menu_create|menu_update|menu_delete|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:menu_list' %}">Menús</a>
+  <a class="{% if un in '|compras|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:compras' %}">Compras</a>
+  <a class="{% if un in '|merma|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:merma' %}">Merma</a>
+  <a class="{% if un in '|consumo_selector|consumo_evento|' %}{{ cls_mon }}{% else %}{{ cls_moff }}{% endif %}" href="{% url 'stock:consumo_selector' %}">Consumo</a>
+  <a class="{{ cls_moff }}" href="/admin/">Admin</a>
+  {% if user.is_authenticated %}
+  <form method="post" action="{% url 'stock:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="{{ cls_moff }} w-full text-left flex items-center gap-stack-sm">
+      <span class="material-symbols-outlined text-[20px]">logout</span>Salir ({{ user.get_username }})
+    </button>
+  </form>
+  {% endif %}
+</nav>
+
+{% endwith %}
+{% endwith %}
+{% endwith %}
+
+<!-- ============================ Contenido ============================ -->
+<main class="max-w-[1200px] mx-auto px-container-padding pt-[112px] pb-container-padding min-h-screen flex flex-col gap-stack-lg">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- ==================== Modal de mensajes (auto-open) ==================== -->
+{% if messages %}
+<div id="mensajesModal" data-modal data-modal-autoopen
+     class="hidden fixed inset-0 z-[100] items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+     role="dialog" aria-modal="true" aria-labelledby="mensajesModalTitulo">
+  <div class="w-full max-w-lg bg-surface-raised border border-surface-variant rounded-xl p-stack-lg shadow-2xl relative" data-modal-card>
+    <button type="button" data-modal-close aria-label="Cerrar"
+            class="absolute top-stack-md right-stack-md text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+
+    <h2 id="mensajesModalTitulo" class="font-headline-md text-headline-md text-on-surface-high pr-stack-lg mb-stack-md">Aviso</h2>
+
+    <div class="flex flex-col gap-stack-sm mb-stack-lg font-body-md text-body-md">
+      {% for message in messages %}
+      <p class="flex items-start gap-stack-sm {% if 'error' in message.tags %}text-error{% elif 'success' in message.tags %}text-primary{% else %}text-on-surface{% endif %}">
+        <span class="material-symbols-outlined text-[20px] shrink-0 mt-[2px]">{% if 'error' in message.tags %}error{% elif 'success' in message.tags %}check_circle{% else %}info{% endif %}</span>
+        <span>{{ message }}</span>
+      </p>
+      {% endfor %}
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <div class="flex justify-end pt-stack-md border-t border-surface-variant">
+      <button type="button" data-modal-close
+              class="luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded">
+        Entendido
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================ Helpers JS ============================ -->
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------------------------
+     Menú hamburguesa
+     --------------------------------------------------------------------- */
+  function initNav() {
+    var toggle = document.getElementById('navToggle');
+    var panel = document.getElementById('navMobile');
+    var icono = document.getElementById('navToggleIcon');
+    if (!toggle || !panel) { return; }
+
+    toggle.addEventListener('click', function () {
+      var abierto = panel.classList.toggle('hidden') === false;
+      toggle.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      toggle.setAttribute('aria-label', abierto ? 'Cerrar menú' : 'Abrir menú');
+      if (icono) { icono.textContent = abierto ? 'close' : 'menu'; }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.classList.contains('hidden')) {
+        panel.classList.add('hidden');
+        toggle.setAttribute('aria-expanded', 'false');
+        if (icono) { icono.textContent = 'menu'; }
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     PESTAÑAS  ·  API por data-*
+       <div data-tabs>
+         <button type="button" data-tab-target="#barra-pane" class="...">Barra</button>
+       </div>
+       <div id="barra-pane" data-tab-panel> ... </div>
+
+     - Abre el primer panel por defecto.
+     - Al cargar respeta el fragmento #hash de la URL (o ?tab=barra-pane).
+     - Al hacer click actualiza el hash sin saltar el scroll.
+     --------------------------------------------------------------------- */
+  var TAB_ON = ['text-primary', 'font-bold', 'border-primary'];
+  var TAB_OFF = ['text-secondary', 'hover:text-primary', 'border-transparent'];
+
+  function pintarBoton(btn, activo) {
+    var suma = activo ? TAB_ON : TAB_OFF;
+    var resta = activo ? TAB_OFF : TAB_ON;
+    resta.forEach(function (c) { btn.classList.remove(c); });
+    suma.forEach(function (c) { btn.classList.add(c); });
+    btn.setAttribute('aria-selected', activo ? 'true' : 'false');
+  }
+
+  function activarTabEn(grupo, id) {
+    if (!grupo || !id) { return false; }
+    var botones = grupo.querySelectorAll('[data-tab-target]');
+    var encontrado = false;
+
+    Array.prototype.forEach.call(botones, function (btn) {
+      var sel = btn.getAttribute('data-tab-target') || '';
+      var panel = sel ? document.querySelector(sel) : null;
+      var esteId = sel.replace(/^#/, '');
+      var activo = esteId === id;
+      if (activo) { encontrado = true; }
+      pintarBoton(btn, activo);
+      if (panel) { panel.classList.toggle('hidden', !activo); }
+    });
+
+    return encontrado;
+  }
+
+  function initTabs() {
+    var grupos = document.querySelectorAll('[data-tabs]');
+    if (!grupos.length) { return; }
+
+    var hash = (window.location.hash || '').replace(/^#/, '');
+    if (!hash) {
+      var m = window.location.search.match(/[?&]tab=([^&]+)/);
+      if (m) { hash = decodeURIComponent(m[1]).replace(/^#/, ''); }
+    }
+    var abrioPorHash = false;
+
+    Array.prototype.forEach.call(grupos, function (grupo) {
+      var botones = grupo.querySelectorAll('[data-tab-target]');
+      if (!botones.length) { return; }
+
+      // Click
+      Array.prototype.forEach.call(botones, function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var sel = btn.getAttribute('data-tab-target') || '';
+          var id = sel.replace(/^#/, '');
+          if (!id) { return; }
+          activarTabEn(grupo, id);
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '#' + id);
+          }
+        });
+      });
+
+      // Estado inicial: hash > data-tab-default > primer botón
+      var inicial = '';
+      if (hash && activarTabEn(grupo, hash)) {
+        inicial = hash;
+        abrioPorHash = true;
+      } else {
+        var porDefecto = grupo.getAttribute('data-tab-default') || '';
+        porDefecto = porDefecto.replace(/^#/, '');
+        if (!porDefecto || !activarTabEn(grupo, porDefecto)) {
+          inicial = (botones[0].getAttribute('data-tab-target') || '').replace(/^#/, '');
+          activarTabEn(grupo, inicial);
+        }
+      }
+    });
+
+    // Si vinimos redirigidos a #barra-pane el browser baja el scroll: lo subimos.
+    if (abrioPorHash) {
+      window.scrollTo(0, 0);
+    }
+  }
+
+  /* ---------------------------------------------------------------------
+     MODALES  ·  API por data-*
+       <button data-modal-open="#modalProducto">Nuevo</button>
+       <div id="modalProducto" data-modal class="hidden fixed inset-0 ..."> ... </div>
+       Cierre: [data-modal-close], tecla Escape, click en el overlay.
+       Auto-apertura al cargar: agregar data-modal-autoopen al modal.
+     --------------------------------------------------------------------- */
+  function abrirModal(modal) {
+    if (!modal) { return; }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.classList.add('overflow-hidden');
+    var foco = modal.querySelector('[data-modal-focus], input, select, textarea, button');
+    if (foco && typeof foco.focus === 'function') {
+      window.setTimeout(function () { foco.focus(); }, 30);
+    }
+  }
+
+  function cerrarModal(modal) {
+    if (!modal) { return; }
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (!document.querySelector('[data-modal]:not(.hidden)')) {
+      document.body.classList.remove('overflow-hidden');
+    }
+  }
+
+  function initModales() {
+    // Disparadores
+    document.addEventListener('click', function (e) {
+      var trigger = e.target.closest ? e.target.closest('[data-modal-open]') : null;
+      if (trigger) {
+        e.preventDefault();
+        abrirModal(document.querySelector(trigger.getAttribute('data-modal-open')));
+        return;
+      }
+      var cierre = e.target.closest ? e.target.closest('[data-modal-close]') : null;
+      if (cierre) {
+        e.preventDefault();
+        cerrarModal(cierre.closest('[data-modal]'));
+      }
+    });
+
+    // Click en el overlay (solo si el click cae en el fondo, no en la tarjeta)
+    Array.prototype.forEach.call(document.querySelectorAll('[data-modal]'), function (modal) {
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) { cerrarModal(modal); }
+      });
+    });
+
+    // Escape cierra el último modal abierto
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') { return; }
+      var abiertos = document.querySelectorAll('[data-modal]:not(.hidden)');
+      if (abiertos.length) { cerrarModal(abiertos[abiertos.length - 1]); }
+    });
+
+    // Auto-apertura (mensajes de Django, o cualquier modal marcado)
+    Array.prototype.forEach.call(document.querySelectorAll('[data-modal][data-modal-autoopen]'), function (modal) {
+      abrirModal(modal);
+    });
+  }
+
+  /* --------------------------------------------------------------------- */
+  document.addEventListener('DOMContentLoaded', function () {
+    initNav();
+    initTabs();
+    initModales();
+  });
+
+  // API pública por si alguna pantalla la necesita
+  window.Victoria = {
+    abrirModal: function (sel) { abrirModal(typeof sel === 'string' ? document.querySelector(sel) : sel); },
+    cerrarModal: function (sel) { cerrarModal(typeof sel === 'string' ? document.querySelector(sel) : sel); },
+    activarTab: function (id) {
+      var limpio = String(id).replace(/^#/, '');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-tabs]'), function (g) {
+        activarTabEn(g, limpio);
+      });
+    }
+  };
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
 </body>
 </html>

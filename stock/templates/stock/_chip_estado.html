@@ -1,0 +1,17 @@
+{% comment %}
+Chip de estado de un Evento. Uso: {% include 'stock/_chip_estado.html' with evento=evento %}
+Los tres estados de Evento.ESTADO_CHOICES: pendiente | confirmado | finalizado.
+{% endcomment %}
+{% if evento.estado == 'confirmado' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-pill font-label-md text-label-md uppercase tracking-wider border border-primary text-primary bg-primary/10">
+  <span class="material-symbols-outlined text-[14px] mr-1">check_circle</span>{{ evento.get_estado_display }}
+</span>
+{% elif evento.estado == 'finalizado' %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-pill font-label-md text-label-md uppercase tracking-wider border border-transparent bg-surface-container-highest text-on-surface-variant">
+  <span class="material-symbols-outlined text-[14px] mr-1">done_all</span>{{ evento.get_estado_display }}
+</span>
+{% else %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-pill font-label-md text-label-md uppercase tracking-wider border border-outline-variant text-on-surface-med">
+  <span class="material-symbols-outlined text-[14px] mr-1">schedule</span>{{ evento.get_estado_display }}
+</span>
+{% endif %}

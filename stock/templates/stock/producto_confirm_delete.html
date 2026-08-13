@@ -1,10 +1,34 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>Eliminar producto</h1>
-<p>¿Seguro que querés eliminar <strong>{{ producto.nombre }}</strong>? Esta acción no se puede deshacer.</p>
-<form method="post">
+
+<div class="w-full max-w-lg mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg flex flex-col items-center text-center gap-stack-lg">
+
+  <div class="flex flex-col items-center gap-stack-sm">
+    <span class="material-symbols-outlined text-error text-[40px]">warning</span>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">¿Desea eliminar?</h1>
+    <p class="font-body-md text-body-md text-on-surface-med">
+      Vas a eliminar <span class="text-on-surface-high font-semibold">{{ producto.nombre }}</span>.
+      Esta acción no se puede deshacer y se borran también sus movimientos de stock.
+    </p>
+  </div>
+
+  {% if object.movimientos.exists %}
+  <div class="mt-stack-md rounded-lg border border-primary/40 bg-primary/5 px-stack-md py-stack-sm text-left">
+    <p class="font-body-sm text-body-sm text-on-surface flex items-start gap-stack-sm">
+      <span class="material-symbols-outlined text-primary text-[18px] shrink-0">info</span>
+      <span>Este producto tiene <strong>{{ object.movimientos.count }}</strong> movimiento{{ object.movimientos.count|pluralize }} cargado{{ object.movimientos.count|pluralize }}, así que <strong>no se va a borrar: se da de baja</strong>. Sale de Compras, Consumo y Merma, pero su historial queda intacto y los eventos ya cerrados no cambian de costo.</span>
+    </p>
+  </div>
+  {% endif %}
+
+  <form method="post" class="flex flex-col sm:flex-row justify-center gap-stack-md w-full pt-stack-md border-t border-surface-variant">
     {% csrf_token %}
-    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
-    <a href="{% url 'stock:producto_list' %}" class="btn btn-secondary">Cancelar</a>
-</form>
+    <a href="{% url 'stock:producto_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">No, cancelar</a>
+    <button type="submit" class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">delete</span><span>Sí, eliminar</span>
+    </button>
+  </form>
+
+</div>
+
 {% endblock %}

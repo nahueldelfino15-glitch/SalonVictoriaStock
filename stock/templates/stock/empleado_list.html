@@ -1,69 +1,117 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Personal</h1>
-    <button type="button" class="btn btn-vino" data-bs-toggle="modal" data-bs-target="#nuevoEmpleadoModal">+ Nuevo empleado</button>
-</div>
 
-<form method="get" class="buscador">
-    <input type="text" name="q" value="{{ q }}" placeholder="Buscar personal...">
-    <button type="submit">🔍</button>
-</form>
+<!-- ============================ Encabezado ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Gestión de Personal</h1>
 
-<div class="tabla-wrapper">
-<table class="table">
-    <thead>
-        <tr><th>Nombre</th><th>Teléfono</th><th>Puesto habitual</th><th></th></tr>
-    </thead>
-    <tbody>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <form method="get" class="relative w-full sm:w-[300px]">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-med pointer-events-none text-[20px]">search</span>
+      <label class="sr-only" for="q-personal">Buscar personal</label>
+      <input type="text" name="q" id="q-personal" aria-label="Buscar personal" value="{{ q|default:'' }}" placeholder="Buscar personal..." class="w-full !pl-10 !pr-10 font-body-sm text-body-sm">
+      <button type="submit" aria-label="Buscar" class="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-med hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+      </button>
+    </form>
+
+    <button type="button" data-modal-open="#modalEmpleado"
+            class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo empleado</span>
+    </button>
+  </div>
+</header>
+
+<!-- ============================== Tabla =============================== -->
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Nombre</th>
+          <th class="px-stack-md py-4 font-semibold">Teléfono</th>
+          <th class="px-stack-md py-4 font-semibold">Puesto habitual</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
         {% for empleado in empleados %}
-        <tr>
-            <td>{{ empleado.nombre }}</td>
-            <td>{{ empleado.telefono }}</td>
-            <td>{{ empleado.puesto_habitual }}</td>
-            <td>
-                <div class="acciones-fila">
-                    <a href="{% url 'stock:empleado_update' empleado.pk %}" class="btn-accion btn-editar">Editar</a>
-                    <a href="{% url 'stock:empleado_delete' empleado.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
-                </div>
-            </td>
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">
+            <div class="flex items-center gap-stack-sm">
+              <span class="w-8 h-8 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-label-md text-label-md uppercase">{{ empleado.nombre|slice:":1"|upper }}</span>
+              <span class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ empleado.nombre }}</span>
+            </div>
+          </td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ empleado.telefono|default:"—" }}</td>
+          <td class="px-stack-md py-4">
+            {% if empleado.puesto_habitual %}
+            <span class="inline-flex items-center gap-unit border border-outline-variant bg-surface-base text-on-surface-variant px-unit py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">{{ empleado.puesto_habitual }}</span>
+            {% else %}
+            <span class="text-on-surface-med">—</span>
+            {% endif %}
+          </td>
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a href="{% url 'stock:empleado_detail' empleado.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+            <a href="{% url 'stock:empleado_update' empleado.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a href="{% url 'stock:empleado_delete' empleado.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="4">No hay personal cargado todavía.</td></tr>
+        <tr>
+          <td colspan="4" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">groups</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay personal cargado.</p>
+          </td>
+        </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ empleados|length }} persona{{ empleados|length|pluralize }}</span>
+  </div>
 </div>
 
-<div class="modal fade" id="nuevoEmpleadoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nuevo empleado</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'stock:empleado_create' %}">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Nombre</label>
-                        <input type="text" name="nombre" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Teléfono</label>
-                        <input type="text" name="telefono" class="form-control">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Puesto habitual</label>
-                        <input type="text" name="puesto_habitual" class="form-control">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-accion btn-volver" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-vino">Guardar</button>
-                </div>
-            </form>
-        </div>
+<!-- ======================= Modal: nuevo empleado ======================= -->
+<div id="modalEmpleado" data-modal role="dialog" aria-modal="true" aria-labelledby="modalEmpleadoTitulo"
+     class="hidden fixed inset-0 z-[100] items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto">
+  <div class="w-full max-w-2xl bg-surface-raised border border-surface-variant rounded-xl p-stack-lg shadow-2xl relative">
+    <button type="button" data-modal-close aria-label="Cerrar" class="absolute top-stack-md right-stack-md text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+
+    <div class="mb-stack-lg pr-stack-lg">
+      <h2 id="modalEmpleadoTitulo" class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high tracking-tight">Nuevo empleado</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant mt-unit">Sumá una persona al equipo de Victoria.</p>
     </div>
+
+    <form method="post" action="{% url 'stock:empleado_create' %}" class="flex flex-col gap-stack-lg">
+      {% csrf_token %}
+
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="empleado_nombre">Nombre</label>
+        <input type="text" name="nombre" id="empleado_nombre" required placeholder="Ej. Juan Pérez" class="w-full font-body-md text-body-md">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="empleado_telefono">Teléfono</label>
+          <input type="text" name="telefono" id="empleado_telefono" placeholder="Ej. 11 1234-5678" class="w-full font-body-md text-body-md">
+        </div>
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="empleado_puesto_habitual">Puesto habitual</label>
+          <input type="text" name="puesto_habitual" id="empleado_puesto_habitual" placeholder="Ej. Mozo" class="w-full font-body-md text-body-md">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+        <button type="button" data-modal-close class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</button>
+        <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
+      </div>
+    </form>
+  </div>
 </div>
+
 {% endblock %}

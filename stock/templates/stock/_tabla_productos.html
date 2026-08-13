@@ -1,24 +1,57 @@
-<div class="tabla-wrapper">
-<table class="table">
-    <thead>
-        <tr><th>Nombre</th><th class="text-end">Stock</th><th class="text-end">Precio</th><th></th></tr>
-    </thead>
-    <tbody>
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Nombre</th>
+          <th class="px-stack-md py-4 font-semibold">Stock</th>
+          <th class="px-stack-md py-4 font-semibold">Precio</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
         {% for producto in productos %}
-        <tr>
-            <td>{{ producto.nombre }}</td>
-            <td class="text-end">{{ producto.stock_actual }}</td>
-            <td class="text-end">${{ producto.precio_unitario }}</td>
-            <td>
-                <div class="acciones-fila">
-                    <a href="{% url 'stock:producto_detail' producto.pk %}" class="btn-accion btn-ver">Ver</a>
-                    <a href="{% url 'stock:producto_delete' producto.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
-                </div>
-            </td>
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">
+            <div class="flex items-center gap-stack-sm">
+              <span class="w-8 h-8 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-label-md text-label-md uppercase">{{ producto.nombre|slice:":1"|upper }}</span>
+              <span class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ producto.nombre }}</span>
+              {% if not producto.activo %}
+              <span class="inline-flex items-center px-2 py-[2px] rounded-pill border border-outline-variant text-on-surface-med font-label-md text-[10px] uppercase tracking-wider">Dado de baja</span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="px-stack-md py-4">
+            <span class="inline-flex items-center gap-unit border border-outline-variant bg-surface-base text-on-surface-variant px-unit py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">{{ producto.stock_actual }} {{ producto.unidad_medida }}</span>
+          </td>
+          <td class="px-stack-md py-4 text-on-surface-med">$ {{ producto.precio_unitario }}</td>
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a href="{% url 'stock:producto_detail' producto.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+            <a href="{% url 'stock:producto_update' producto.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            {% if producto.activo %}
+            <a href="{% url 'stock:producto_delete' producto.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            {% else %}
+            <form method="post" action="{% url 'stock:producto_reactivar' producto.pk %}" class="inline-flex ml-2">
+              {% csrf_token %}
+              <button type="submit" aria-label="Reactivar" title="Volver a poner en circulación" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">restore_from_trash</span></button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="4">No hay productos cargados en este sector.</td></tr>
+        <tr>
+          <td colspan="4" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inbox</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay productos cargados en este sector.</p>
+          </td>
+        </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ productos|length }} producto{{ productos|length|pluralize }}</span>
+  </div>
 </div>

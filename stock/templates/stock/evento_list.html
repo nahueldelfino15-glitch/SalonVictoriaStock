@@ -1,41 +1,81 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Eventos</h1>
-    <div class="d-flex gap-2">
-        <a href="{% url 'stock:evento_historial' %}" class="btn-accion btn-volver">Historial</a>
-        <a href="{% url 'stock:evento_create' %}" class="btn btn-vino">+ Nuevo evento</a>
-    </div>
-</div>
 
-<form method="get" class="buscador">
-    <input type="text" name="q" value="{{ q }}" placeholder="Buscar evento...">
-    <button type="submit">🔍</button>
-</form>
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Eventos</h1>
 
-<div class="tabla-wrapper">
-<table class="table">
-    <thead>
-        <tr><th>Nombre</th><th>Fecha</th><th>Estado</th><th class="text-end">Gasto total</th><th></th></tr>
-    </thead>
-    <tbody>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <form method="get" class="relative w-full sm:w-[300px]">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-med pointer-events-none text-[20px]">search</span>
+      <label class="sr-only" for="q-eventos">Buscar evento</label>
+      <input type="text" name="q" id="q-eventos" aria-label="Buscar evento" value="{{ q|default:'' }}" placeholder="Buscar evento..." class="w-full !pl-10 !pr-10 font-body-sm text-body-sm">
+      <button type="submit" aria-label="Buscar" class="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-med hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+      </button>
+    </form>
+
+    <a href="{% url 'stock:evento_historial' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">history</span><span>Historial</span>
+    </a>
+
+    <a href="{% url 'stock:evento_create' %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo evento</span>
+    </a>
+  </div>
+</header>
+
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Fecha</th>
+          <th class="px-stack-md py-4 font-semibold">Evento</th>
+          <th class="px-stack-md py-4 font-semibold">Asistentes</th>
+          <th class="px-stack-md py-4 font-semibold">Estado</th>
+          <th class="px-stack-md py-4 font-semibold">Resultado</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
         {% for evento in eventos %}
-        <tr>
-            <td>{{ evento.nombre }}</td>
-            <td>{{ evento.fecha }}</td>
-            <td>{{ evento.get_estado_display }}</td>
-            <td class="text-end">${{ evento.gasto_total }}</td>
-            <td>
-                <div class="acciones-fila">
-                    <a href="{% url 'stock:evento_detail' evento.pk %}" class="btn-accion btn-ver">Ver</a>
-                    <a href="{% url 'stock:evento_delete' evento.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
-                </div>
-            </td>
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">{{ evento.fecha|date:"d/m/Y" }}</td>
+          <td class="px-stack-md py-4 font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ evento.nombre }}</td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ evento.asistentes }}</td>
+          <td class="px-stack-md py-4">
+            {% include 'stock/_chip_estado.html' with evento=evento %}
+          </td>
+          <td class="px-stack-md py-4">
+            {% if evento.tiene_precio_cargado %}
+              {% with m=evento.margen %}
+              <span class="font-body-md text-body-md {% if m < 0 %}text-error{% else %}text-primary{% endif %}">$ {{ m|floatformat:2 }}</span>
+              {% endwith %}
+            {% else %}
+              <span class="font-body-sm text-body-sm text-on-surface-med">sin precio</span>
+            {% endif %}
+          </td>
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+            <a href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a href="{% url 'stock:evento_delete' evento.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5">No hay eventos cargados todavía.</td></tr>
+        <tr>
+          <td colspan="6" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">celebration</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay eventos cargados.</p>
+          </td>
+        </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ eventos|length }} evento{{ eventos|length|pluralize }}</span>
+  </div>
 </div>
+
 {% endblock %}

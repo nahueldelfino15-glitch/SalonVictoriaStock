@@ -1,65 +1,310 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>{{ evento.nombre }}</h1>
-<p><strong>Fecha:</strong> {{ evento.fecha }}</p>
-<p><strong>Asistentes:</strong> {{ evento.asistentes|default:"—" }}</p>
-<p><strong>Estado:</strong> {{ evento.get_estado_display }}</p>
-<p><strong>Paquete:</strong> {{ evento.paquete.nombre|default:"—" }}</p>
-<p><strong>Menú:</strong> {{ evento.menu.nombre|default:"—" }}</p>
-<p><strong>Teléfono de contacto:</strong> {{ evento.telefono_contacto|default:"—" }}</p>
-<p>{{ evento.notas }}</p>
+{% with movs=evento.movimientos.all pers=evento.personal.all gs=evento.gasto_stock gp=evento.gasto_personal %}
 
-<h4>Consumo</h4>
-<div class="tabla-wrapper">
-<table class="table">
-    <thead><tr><th>Producto</th><th>Tipo</th><th class="text-end">Cantidad</th><th></th></tr></thead>
-    <tbody>
-        {% for m in evento.movimientos.all %}
-        <tr>
-            <td>{{ m.producto.nombre }}</td>
-            <td>{{ m.get_tipo_display }}</td>
-            <td class="text-end">{{ m.cantidad }}</td>
-            <td>
-                <div class="acciones-fila">
-                    <a href="{% url 'stock:movimientostock_update' m.pk %}" class="btn-accion btn-editar">Editar</a>
-                    <a href="{% url 'stock:movimientostock_delete' m.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
-                </div>
-            </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="4">Sin movimientos registrados.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+<!-- ===================== Cabecera ===================== -->
+<div class="flex flex-col gap-stack-md w-full">
+  <a href="{% url 'stock:evento_list' %}"
+     class="inline-flex items-center gap-unit w-fit text-on-surface-med hover:text-primary transition-colors font-label-md text-label-md uppercase tracking-wider">
+    <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+    <span>Volver a Eventos</span>
+  </a>
+
+  <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+    <div>
+      <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{{ evento.nombre }}</h1>
+      <p class="font-body-md text-body-md text-on-surface-med mt-unit">Detalle del evento y gasto asociado.</p>
+    </div>
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+      {% if evento.cerrado %}
+      <form method="post" action="{% url 'stock:evento_reabrir' evento.pk %}">
+        {% csrf_token %}
+        <button type="submit"
+                class="w-full inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">lock_open</span><span>Reabrir evento</span>
+        </button>
+      </form>
+      {% endif %}
+      <a href="{% url 'stock:evento_update' evento.pk %}"
+         class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+        <span class="material-symbols-outlined text-[18px]">edit</span><span>Editar evento</span>
+      </a>
+      <a href="{% url 'stock:evento_delete' evento.pk %}"
+         class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+        <span class="material-symbols-outlined text-[18px]">delete</span><span>Eliminar</span>
+      </a>
+    </div>
+  </header>
 </div>
-<h4>Personal asignado</h4>
-<div class="tabla-wrapper">
-<table class="table">
-    <thead><tr><th>Empleado</th><th>Puesto</th><th class="text-end">Horas</th><th class="text-end">Pago</th><th></th></tr></thead>
-    <tbody>
-        {% for p in evento.personal.all %}
-        <tr>
-            <td>{{ p.empleado.nombre }}</td>
-            <td>{{ p.puesto }}</td>
-            <td class="text-end">{{ p.horas_trabajadas }}</td>
-            <td class="text-end">${{ p.pago }}</td>
-            <td>
-                <div class="acciones-fila">
-                    <a href="{% url 'stock:personalevento_update' p.pk %}" class="btn-accion btn-editar">Editar</a>
-                    <a href="{% url 'stock:personalevento_delete' p.pk %}" class="btn-accion btn-eliminar">Quitar</a>
-                </div>
-            </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="5">Sin personal asignado.</td></tr>
-        {% endfor %}
-    </tbody>
-</table>
+
+{% if evento.cerrado %}
+<div class="flex items-start gap-stack-sm border border-primary/40 bg-primary/5 rounded-xl px-stack-md py-stack-sm">
+  <span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-[2px]">lock</span>
+  <div>
+    <p class="font-body-md text-body-md text-on-surface-high">Este evento está cerrado.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Sus costos quedaron congelados a los precios del momento y no acepta más carga de consumo ni de personal. Si te falta corregir algo, reabrilo.</p>
+  </div>
 </div>
-<p><strong>Gasto total del evento: ${{ evento.gasto_total }}</strong></p>
+{% endif %}
 
-<a href="{% url 'stock:evento_update' evento.pk %}" class="btn-accion btn-editar">Editar evento</a>
-<a href="{% url 'stock:evento_delete' evento.pk %}" class="btn-accion btn-eliminar">Eliminar evento</a>
-<a href="{% url 'stock:evento_list' %}" class="btn-accion btn-volver">Volver</a>
+{% if evento.reabierto_el %}
+<div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-xl px-stack-md py-stack-sm">
+  <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">history</span>
+  <p class="font-body-sm text-body-sm text-on-surface-med">Reabierto el {{ evento.reabierto_el|date:"d/m/Y H:i" }}.</p>
+</div>
+{% endif %}
 
+<!-- ===================== Tira de datos ===================== -->
+<div class="bg-surface-raised rounded-xl border border-surface-overlay p-stack-lg">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-stack-md">
+
+    <div class="flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">Fecha</span>
+      <span class="font-body-md text-body-md text-on-surface-high">{{ evento.fecha|date:"d/m/Y" }}</span>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">Asistentes</span>
+      <span class="font-body-md text-body-md text-on-surface-high">{{ evento.asistentes|default:"—" }}</span>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">Estado</span>
+      <span class="w-fit">
+        {% include 'stock/_chip_estado.html' with evento=evento %}
+      </span>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">Paquete</span>
+      <span class="font-body-md text-body-md text-on-surface-high">{{ evento.paquete.nombre|default:"—" }}</span>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">Menú</span>
+      <span class="font-body-md text-body-md text-on-surface-high">{{ evento.menu.nombre|default:"—" }}</span>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">Teléfono</span>
+      <span class="font-body-md text-body-md text-on-surface-high">{{ evento.telefono_contacto|default:"—" }}</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== Notas ===================== -->
+<section class="bg-surface-raised rounded-xl border border-surface-overlay p-stack-lg flex flex-col gap-stack-md">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Notas</h2>
+  {% if evento.notas %}
+  <p class="font-body-md text-body-md text-on-surface">{{ evento.notas|linebreaksbr }}</p>
+  {% else %}
+  <p class="font-body-md text-body-md text-on-surface-med italic">Este evento no tiene notas cargadas.</p>
+  {% endif %}
+</section>
+
+<!-- ===================== Consumo de stock ===================== -->
+<section class="flex flex-col gap-stack-md">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Consumo de Stock</h2>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Producto</th>
+            <th class="px-stack-md py-4 font-semibold">Tipo</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Cantidad</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Precio unit.</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for m in movs %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors group">
+            <td class="px-stack-md py-4 text-on-surface-high">{{ m.producto.nombre }}</td>
+            <td class="px-stack-md py-4">{{ m.get_tipo_display }}</td>
+            <td class="px-stack-md py-4 text-right">{{ m.cantidad }} {{ m.producto.unidad_medida }}</td>
+            <td class="px-stack-md py-4 text-right">$ {{ m.producto.precio_unitario|floatformat:2 }}</td>
+            <td class="px-stack-md py-4 text-right whitespace-nowrap">
+              <a href="{% url 'stock:movimientostock_update' m.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a href="{% url 'stock:movimientostock_delete' m.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">local_bar</span>
+              <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay consumo registrado para este evento.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>{{ movs|length }} movimiento{{ movs|length|pluralize }}</span>
+      <span>Gasto stock: <span class="text-primary font-semibold">$ {{ gs|floatformat:2 }}</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Personal asignado ===================== -->
+<section class="flex flex-col gap-stack-md">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Personal Asignado</h2>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Empleado</th>
+            <th class="px-stack-md py-4 font-semibold">Puesto</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Horas</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Pago</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for p in pers %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors group">
+            <td class="px-stack-md py-4 text-on-surface-high">{{ p.empleado.nombre }}</td>
+            <td class="px-stack-md py-4">{{ p.puesto|default:"—" }}</td>
+            <td class="px-stack-md py-4 text-right">{{ p.horas_trabajadas|floatformat:"-2" }} h</td>
+            <td class="px-stack-md py-4 text-right">$ {{ p.pago|floatformat:2 }}</td>
+            <td class="px-stack-md py-4 text-right whitespace-nowrap">
+              <a href="{% url 'stock:personalevento_update' p.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a href="{% url 'stock:personalevento_delete' p.pk %}" aria-label="Quitar" title="Quitar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">groups</span>
+              <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay personal asignado a este evento.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>{{ pers|length }} persona{{ pers|length|pluralize }}</span>
+      <span>Gasto personal: <span class="text-primary font-semibold">$ {{ gp|floatformat:2 }}</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Gastos ===================== -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Gasto stock</p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ gs|floatformat:2 }}</p>
+  </div>
+
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Gasto personal</p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ gp|floatformat:2 }}</p>
+  </div>
+
+  <div class="bg-surface-raised border border-primary/40 rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Costo total</p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold text-primary mt-stack-sm">$ {{ evento.gasto_total|floatformat:2 }}</p>
+  </div>
+
+</div>
+
+<!-- ===================== Cargos al cliente ===================== -->
+<section class="flex flex-col gap-stack-md w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
+    <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Cargos al cliente</h2>
+    {% if not evento.cerrado %}
+    <a href="{% url 'stock:cargoevento_create' evento.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar cargo</span>
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Concepto</th>
+            <th class="px-stack-md py-4 font-semibold">Monto</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for c in evento.cargos.all %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors">
+            <td class="px-stack-md py-4 text-on-surface-high">{{ c.concepto }}</td>
+            <td class="px-stack-md py-4 text-on-surface-med">$ {{ c.monto|floatformat:2 }}</td>
+            <td class="px-stack-md py-4 text-right whitespace-nowrap">
+              <a href="{% url 'stock:cargoevento_update' c.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a href="{% url 'stock:cargoevento_delete' c.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">receipt_long</span>
+              <p class="font-body-md text-body-md text-on-surface-med">Sin adicionales facturados.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>{{ evento.cargos.all|length }} cargo{{ evento.cargos.all|length|pluralize }}</span>
+      <span>Adicionales: <span class="text-primary font-semibold">$ {{ evento.ingreso_cargos|floatformat:2 }}</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Resultado ===================== -->
+{% if evento.tiene_precio_cargado %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Facturado</p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ evento.ingreso_total|floatformat:2 }}</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+      {% if evento.precio_cerrado is not None %}Precio cerrado{% else %}{{ evento.asistentes|default:0 }} × $ {{ evento.precio_por_persona|floatformat:2 }}{% endif %}
+      {% if evento.ingreso_cargos %} + adicionales{% endif %}
+    </p>
+  </div>
+
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Costo total</p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ evento.gasto_total|floatformat:2 }}</p>
+  </div>
+
+  {% with m=evento.margen %}
+  <div class="bg-surface-raised rounded-xl p-stack-lg border {% if m < 0 %}border-error/50{% else %}border-primary/40{% endif %}">
+    <p class="font-label-md text-label-md uppercase tracking-wider {% if m < 0 %}text-error{% else %}text-primary{% endif %}">
+      {% if m < 0 %}Pérdida{% else %}Ganancia{% endif %}
+    </p>
+    <p class="font-display-lg text-[32px] leading-10 font-semibold mt-stack-sm {% if m < 0 %}text-error{% else %}text-primary{% endif %}">$ {{ m|floatformat:2 }}</p>
+    {% if evento.margen_porcentaje is not None %}
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">{{ evento.margen_porcentaje|floatformat:1 }} % de lo facturado</p>
+    {% endif %}
+  </div>
+  {% endwith %}
+
+</div>
+{% else %}
+<div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-xl px-stack-md py-stack-sm">
+  <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">payments</span>
+  <div>
+    <p class="font-body-md text-body-md text-on-surface">Este evento no tiene precio cargado, así que no se puede calcular la ganancia.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Cargá el precio por persona o el precio cerrado desde <a href="{% url 'stock:evento_update' evento.pk %}" class="text-primary hover:underline">editar evento</a>.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endwith %}
 {% endblock %}

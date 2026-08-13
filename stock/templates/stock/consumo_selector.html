@@ -1,23 +1,53 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1 class="mb-4">Consumo - Elegir evento</h1>
-<div class="tabla-wrapper">
-<table class="table">
-    <thead><tr><th>Nombre</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
-    <tbody>
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Consumo</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">Elegí el evento al que le querés cargar el consumo.</p>
+  </div>
+</header>
+
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Nombre</th>
+          <th class="px-stack-md py-4 font-semibold">Fecha</th>
+          <th class="px-stack-md py-4 font-semibold">Estado</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acción</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
         {% for evento in eventos %}
-        <tr>
-            <td>{{ evento.nombre }}</td>
-            <td>{{ evento.fecha }}</td>
-            <td>{{ evento.get_estado_display }}</td>
-            <td>
-                <a href="{% url 'stock:consumo_evento' evento.pk %}" class="btn-accion btn-editar">Cargar consumo</a>
-            </td>
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4 text-on-surface-high">{{ evento.nombre }}</td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ evento.fecha|date:"d/m/Y" }}</td>
+          <td class="px-stack-md py-4">
+            {% include 'stock/_chip_estado.html' with evento=evento %}
+          </td>
+          <td class="px-stack-md py-4 text-right">
+            <a href="{% url 'stock:consumo_evento' evento.pk %}"
+               class="inline-flex items-center justify-center gap-unit {% if evento.estado == 'finalizado' %}luxury-button-secondary{% else %}luxury-button-primary font-bold active:scale-95{% endif %} font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+              <span class="material-symbols-outlined text-[18px]">local_bar</span><span>Cargar consumo</span>
+            </a>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="4">No hay eventos cargados todavía.</td></tr>
+        <tr>
+          <td colspan="4" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inbox</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay eventos cargados.</p>
+          </td>
+        </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ eventos|length }} evento{{ eventos|length|pluralize }}</span>
+  </div>
 </div>
+
 {% endblock %}

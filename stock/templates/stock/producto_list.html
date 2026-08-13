@@ -1,65 +1,107 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1>Stock</h1>
-    <button type="button" class="btn btn-vino" data-bs-toggle="modal" data-bs-target="#nuevoProductoModal">+ Nuevo producto</button>
-</div>
 
-<form method="get" class="buscador">
-    <input type="text" name="q" value="{{ q }}" placeholder="Buscar producto...">
-    <button type="submit">🔍</button>
-</form>
+<!-- ============================ Encabezado ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Productos</h1>
 
-<h3 class="mt-4">Barra</h3>
-{% include 'stock/_tabla_productos.html' with productos=productos_barra %}
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <form method="get" class="relative w-full sm:w-[300px]">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-med pointer-events-none text-[20px]">search</span>
+      <label class="sr-only" for="q-productos">Buscar producto</label>
+      <input type="text" name="q" id="q-productos" aria-label="Buscar producto" value="{{ q|default:'' }}" placeholder="Buscar producto..." class="w-full !pl-10 !pr-10 font-body-sm text-body-sm">
+      <button type="submit" aria-label="Buscar" class="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-med hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+      </button>
+    </form>
 
-<h3 class="mt-4">Cocina</h3>
-{% include 'stock/_tabla_productos.html' with productos=productos_cocina %}
+    <button type="button" data-modal-open="#modalProducto" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo Producto</span>
+    </button>
+  </div>
+</header>
 
-<h3 class="mt-4">Extras</h3>
-{% include 'stock/_tabla_productos.html' with productos=productos_extras %}
+<!-- ============================ Barra ============================ -->
+<section class="flex flex-col gap-stack-md w-full">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high flex items-center gap-stack-sm">
+    <span class="material-symbols-outlined text-primary text-[20px]">local_bar</span>Barra
+  </h2>
+  {% include 'stock/_tabla_productos.html' with productos=productos_barra %}
+</section>
 
-<div class="modal fade" id="nuevoProductoModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nuevo producto</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="post" action="{% url 'stock:producto_create' %}">
-                {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Nombre</label>
-                        <input type="text" name="nombre" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Sector</label>
-                        <select name="sector" class="form-select" required>
-                            <option value="barra">Barra</option>
-                            <option value="cocina">Cocina</option>
-                            <option value="extras">Extras</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Precio unitario</label>
-                        <input type="number" step="0.01" name="precio_unitario" class="form-control" value="0">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Stock inicial</label>
-                        <input type="number" name="stock_actual" class="form-control" value="0">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Unidad de medida</label>
-                        <input type="text" name="unidad_medida" class="form-control" value="unidad">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-accion btn-volver" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-vino">Guardar</button>
-                </div>
-            </form>
-        </div>
+<!-- ============================ Cocina ============================ -->
+<section class="flex flex-col gap-stack-md w-full">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high flex items-center gap-stack-sm">
+    <span class="material-symbols-outlined text-primary text-[20px]">restaurant</span>Cocina
+  </h2>
+  {% include 'stock/_tabla_productos.html' with productos=productos_cocina %}
+</section>
+
+<!-- ============================ Extras ============================ -->
+<section class="flex flex-col gap-stack-md w-full">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high flex items-center gap-stack-sm">
+    <span class="material-symbols-outlined text-primary text-[20px]">inventory_2</span>Extras
+  </h2>
+  {% include 'stock/_tabla_productos.html' with productos=productos_extras %}
+</section>
+
+<!-- ==================== Modal · Nuevo producto ==================== -->
+<div id="modalProducto" data-modal role="dialog" aria-modal="true" aria-labelledby="modalProductoTitulo"
+     class="hidden fixed inset-0 z-[100] items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto">
+  <div class="w-full max-w-2xl bg-surface-raised border border-surface-variant rounded-xl p-stack-lg shadow-2xl relative">
+    <button type="button" data-modal-close aria-label="Cerrar" class="absolute top-stack-md right-stack-md text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+
+    <div class="mb-stack-lg pr-stack-lg">
+      <h2 id="modalProductoTitulo" class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high tracking-tight">Nuevo Producto</h2>
+      <p class="font-body-md text-body-md text-on-surface-variant mt-unit">Cargá los datos del producto.</p>
     </div>
+
+    <form method="post" action="{% url 'stock:producto_create' %}" class="flex flex-col gap-stack-lg">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_nombre">Nombre</label>
+        <input type="text" name="nombre" id="id_modal_nombre" maxlength="100" required placeholder="Ej. Fernet Branca" class="w-full font-body-md text-body-md">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_sector">Sector</label>
+          <select name="sector" id="id_modal_sector" required class="w-full font-body-md text-body-md">
+            <option value="barra">Barra</option>
+            <option value="cocina">Cocina</option>
+            <option value="extras">Extras</option>
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_unidad_medida">Unidad de medida</label>
+          <input type="text" name="unidad_medida" id="id_modal_unidad_medida" value="unidad" maxlength="20" required placeholder="Ej. unidad, litro, kg" class="w-full font-body-md text-body-md">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_stock_actual">Stock inicial</label>
+          <input type="number" name="stock_actual" id="id_modal_stock_actual" value="0" step="0.01" min="0" class="w-full font-body-md text-body-md">
+          <p class="font-body-sm text-body-sm text-on-surface-med">Se registra como una entrada, para que el historial cierre.</p>
+        </div>
+
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_modal_precio_unitario">Precio unitario</label>
+          <input type="number" name="precio_unitario" id="id_modal_precio_unitario" step="0.01" min="0" value="0" required class="w-full font-body-md text-body-md">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+        <button type="button" data-modal-close class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</button>
+        <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
+      </div>
+    </form>
+  </div>
 </div>
+
 {% endblock %}

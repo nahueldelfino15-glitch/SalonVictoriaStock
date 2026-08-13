@@ -4,9 +4,8 @@
       <thead>
         <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
           <th class="px-stack-md py-4 font-semibold">Producto</th>
-          <th class="px-stack-md py-4 font-semibold">Cantidad actual</th>
-          <th class="px-stack-md py-4 font-semibold">Precio compra</th>
-          <th class="px-stack-md py-4 font-semibold text-right">Agregar stock</th>
+          <th class="px-stack-md py-4 font-semibold">Stock actual</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Registrar merma</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-overlay text-on-surface">
@@ -14,25 +13,34 @@
         <tr class="hover:bg-[#1C1C1C] transition-colors group">
           <td class="px-stack-md py-4 text-on-surface">{{ producto.nombre }}</td>
           <td class="px-stack-md py-4 text-on-surface-med">{{ producto.stock_actual }} {{ producto.unidad_medida }}</td>
-          <td class="px-stack-md py-4 text-on-surface-med">${{ producto.precio_unitario }}</td>
           <td class="px-stack-md py-4 text-right">
-            <form method="post" action="{% url 'stock:compras' %}" class="flex items-center justify-end gap-stack-sm">
+            <form method="post" action="{% url 'stock:merma' %}" class="flex items-center justify-end gap-stack-sm">
               {% csrf_token %}
               <input type="hidden" name="producto_id" value="{{ producto.pk }}">
               <input type="hidden" name="tab" value="{{ tab_id }}">
-              <label class="sr-only" for="cantidad-{{ tab_id }}-{{ producto.pk }}">Cantidad a agregar de {{ producto.nombre }}</label>
+
+              <label class="sr-only" for="motivo-{{ tab_id }}-{{ producto.pk }}">Motivo de la merma de {{ producto.nombre }}</label>
+              <select name="motivo" id="motivo-{{ tab_id }}-{{ producto.pk }}" required
+                      class="!bg-surface-base !border !border-solid !border-outline-variant !rounded !px-2 !py-1 font-body-sm text-body-sm">
+                {% for valor, etiqueta in motivos %}
+                <option value="{{ valor }}">{{ etiqueta }}</option>
+                {% endfor %}
+              </select>
+
+              <label class="sr-only" for="cantidad-{{ tab_id }}-{{ producto.pk }}">Cantidad perdida de {{ producto.nombre }}</label>
               <input type="number" name="cantidad" id="cantidad-{{ tab_id }}-{{ producto.pk }}" step="0.01" min="0.01" placeholder="Cant." required
                      class="!w-20 !bg-surface-base !border !border-solid !border-outline-variant !rounded !px-2 !py-1 text-center font-body-sm text-body-sm">
+
               <button type="submit"
                       class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
-                <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar</span>
+                <span class="material-symbols-outlined text-[18px]">remove</span><span>Registrar</span>
               </button>
             </form>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" class="px-stack-md py-16 text-center">
+          <td colspan="3" class="px-stack-md py-16 text-center">
             <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inbox</span>
             <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay productos cargados en este sector.</p>
           </td>

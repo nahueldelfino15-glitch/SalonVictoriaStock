@@ -1,46 +1,127 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<div class="calendario-wrapper mb-4">
-    <div class="calendario-header">
-        <a href="{% url 'stock:home' %}?year={{ mes_anterior.year }}&month={{ mes_anterior.month }}" class="cal-nav">‹</a>
-        <h2 class="cal-titulo">{{ nombre_mes }} <span class="cal-anio">{{ year }}</span></h2>
-        <a href="{% url 'stock:home' %}?year={{ mes_siguiente.year }}&month={{ mes_siguiente.month }}" class="cal-nav">›</a>
-    </div>
-    <div class="calendario-grid">
-        <div class="cal-diasemana">Lun</div>
-        <div class="cal-diasemana">Mar</div>
-        <div class="cal-diasemana">Mié</div>
-        <div class="cal-diasemana">Jue</div>
-        <div class="cal-diasemana">Vie</div>
-        <div class="cal-diasemana">Sáb</div>
-        <div class="cal-diasemana">Dom</div>
 
-        {% for semana in semanas %}
+<!-- ============================ Calendario ============================ -->
+<section class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+
+  <!-- Cabecera: mes + año, navegación y alta de evento -->
+  <div class="px-stack-lg py-stack-md border-b border-surface-overlay flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md">
+    <div class="flex items-center gap-stack-md">
+      <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{{ nombre_mes }} {{ year }}</h1>
+      <div class="flex items-center gap-stack-sm">
+        <a href="{% url 'stock:calendario' %}?year={{ mes_anterior.year }}&amp;month={{ mes_anterior.month }}"
+           aria-label="Mes anterior" title="Mes anterior"
+           class="inline-flex text-on-surface-med hover:text-primary hover:bg-surface-overlay transition-colors p-1 rounded">
+          <span class="material-symbols-outlined text-[20px]">chevron_left</span>
+        </a>
+        <a href="{% url 'stock:calendario' %}?year={{ mes_siguiente.year }}&amp;month={{ mes_siguiente.month }}"
+           aria-label="Mes siguiente" title="Mes siguiente"
+           class="inline-flex text-on-surface-med hover:text-primary hover:bg-surface-overlay transition-colors p-1 rounded">
+          <span class="material-symbols-outlined text-[20px]">chevron_right</span>
+        </a>
+      </div>
+    </div>
+
+    <a href="{% url 'stock:evento_create' %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Nuevo Evento</span>
+    </a>
+  </div>
+
+  <!-- Grilla -->
+  <div class="p-stack-lg">
+    <div class="overflow-x-auto w-full">
+      <div class="min-w-[720px]">
+
+        <!-- Días de la semana (arranca lunes) -->
+        <div class="grid grid-cols-7 gap-px mb-stack-sm text-center">
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Lun</div>
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Mar</div>
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Mié</div>
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Jue</div>
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Vie</div>
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Sáb</div>
+          <div class="font-label-md text-label-md text-primary uppercase tracking-wider">Dom</div>
+        </div>
+
+        <!-- Días -->
+        <div class="grid grid-cols-7 gap-px bg-surface-overlay rounded-lg overflow-hidden border border-surface-overlay">
+          {% for semana in semanas %}
             {% for dia in semana %}
-                {% if dia %}
-                <div class="cal-dia {% if dia.es_hoy %}cal-hoy{% endif %}">
-                    <span class="cal-numero">{{ dia.numero }}</span>
-                    {% for evento in dia.eventos %}
-                    <a href="{% url 'stock:evento_detail' evento.pk %}" class="cal-evento">{{ evento.nombre|truncatechars:14 }}</a>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="cal-dia cal-vacio"></div>
-                {% endif %}
-            {% endfor %}
-        {% endfor %}
-    </div>
-</div>
+              {% if dia %}
+              <div class="min-w-0 min-h-[120px] p-stack-sm flex flex-col gap-unit transition-colors {% if dia.es_hoy %}bg-surface-raised border border-primary hover:bg-[#1C1C1C]{% else %}bg-surface-raised hover:bg-[#1C1C1C]{% endif %}">
+                <span class="font-body-sm text-body-sm {% if dia.es_hoy %}text-primary font-bold{% else %}text-on-surface-med{% endif %}">{{ dia.numero }}</span>
 
-<h3 class="mt-5">Próximos eventos</h3>
-<ul class="list-group">
-    {% for evento in proximos %}
-    <li class="list-group-item d-flex justify-content-between align-items-center">
-        <a href="{% url 'stock:evento_detail' evento.pk %}">{{ evento.nombre }}</a>
-        <span class="badge bg-primary rounded-pill">{{ evento.fecha }}</span>
-    </li>
-    {% empty %}
-    <li class="list-group-item">No hay eventos próximos cargados.</li>
-    {% endfor %}
-</ul>
+                {% for evento in dia.eventos %}
+                <a href="{% url 'stock:evento_detail' evento.pk %}"
+                   title="{{ evento.nombre }}"
+                   class="block min-w-0 bg-surface-overlay border-l-2 {% if evento.estado == 'confirmado' %}border-primary{% elif evento.estado == 'pendiente' %}border-outline-variant{% else %}border-gold-muted{% endif %} rounded-r px-2 py-1 hover:bg-[#2e2e2e] transition-colors">
+                  <span class="block truncate font-body-sm text-[12px] leading-4 text-on-surface font-medium">{{ evento.nombre }}</span>
+                  <span class="block truncate font-label-md text-[10px] leading-4 uppercase tracking-wider {% if evento.estado == 'confirmado' %}text-primary{% else %}text-on-surface-med{% endif %}">{{ evento.get_estado_display }}</span>
+                </a>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="min-w-0 min-h-[120px] bg-surface-base"></div>
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= Listado de Eventos ========================= -->
+<section class="flex flex-col gap-stack-md">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md border-b border-surface-overlay pb-stack-md">
+    <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Próximos eventos</h2>
+    <p class="font-body-sm text-body-sm text-on-surface-med">Los 10 más cercanos, de hoy en adelante.</p>
+  </div>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Fecha</th>
+            <th class="px-stack-md py-4 font-semibold">Evento</th>
+            <th class="px-stack-md py-4 font-semibold">Asistentes</th>
+            <th class="px-stack-md py-4 font-semibold">Estado</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for evento in proximos %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors group">
+            <td class="px-stack-md py-4">{{ evento.fecha|date:"d/m/Y" }}</td>
+            <td class="px-stack-md py-4 text-on-surface-high font-medium">{{ evento.nombre }}</td>
+            <td class="px-stack-md py-4 text-on-surface-med">{{ evento.asistentes }}</td>
+            <td class="px-stack-md py-4">
+              {% include 'stock/_chip_estado.html' with evento=evento %}
+            </td>
+            <td class="px-stack-md py-4 text-right whitespace-nowrap">
+              <a href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
+              <a href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">celebration</span>
+              <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay eventos próximos cargados.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>{{ proximos|length }} evento{{ proximos|length|pluralize }}</span>
+    </div>
+  </div>
+</section>
+
 {% endblock %}

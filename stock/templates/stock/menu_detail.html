@@ -1,12 +1,92 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>{{ menu.nombre }}</h1>
-<ul class="list-group mb-3">
-    <li class="list-group-item"><strong>Descripción:</strong> {{ menu.descripcion|default:"—" }}</li>
-</ul>
-<div class="acciones-fila">
-    <a href="{% url 'stock:menu_update' menu.pk %}" class="btn-accion btn-editar">Editar</a>
-    <a href="{% url 'stock:menu_delete' menu.pk %}" class="btn-accion btn-eliminar">Eliminar</a>
-    <a href="{% url 'stock:menu_list' %}" class="btn-accion btn-volver">Volver</a>
+
+<!-- ============================ Header ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div class="flex items-center gap-stack-md min-w-0">
+    <span class="w-12 h-12 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-headline-sm text-headline-sm uppercase">{% with palabras=menu.nombre.split %}{{ palabras.0|first|upper }}{% if palabras.1 %}{{ palabras.1|first|upper }}{% endif %}{% endwith %}</span>
+    <div class="min-w-0">
+      <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{{ menu.nombre }}</h1>
+      <p class="font-body-md text-body-md text-on-surface-med">Detalle del menú</p>
+    </div>
+  </div>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <a href="{% url 'stock:menu_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">arrow_back</span><span>Volver</span>
+    </a>
+    <a href="{% url 'stock:menu_update' menu.pk %}" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">edit</span><span>Editar</span>
+    </a>
+  </div>
+</header>
+
+<!-- ============================ Datos ============================ -->
+<div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+  <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Descripción</p>
+  <p class="font-body-md text-body-md text-on-surface mt-stack-sm whitespace-pre-line">{{ menu.descripcion|default:"—" }}</p>
 </div>
+
+<!-- ============================ Receta ============================ -->
+<section class="flex flex-col gap-stack-md w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
+    <div>
+      <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Receta</h2>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Cuánto de cada producto se calcula por persona.</p>
+    </div>
+    <a href="{% url 'stock:lineareceta_create_menu' menu.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar producto</span>
+    </a>
+  </div>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Producto</th>
+            <th class="px-stack-md py-4 font-semibold">Por persona</th>
+            <th class="px-stack-md py-4 font-semibold">Costo por persona</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for linea in menu.lineas.all %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors">
+            <td class="px-stack-md py-4 text-on-surface-high">{{ linea.producto.nombre }}</td>
+            <td class="px-stack-md py-4 text-on-surface-med">{{ linea.cantidad_por_persona }} {{ linea.producto.unidad_medida }}</td>
+            <td class="px-stack-md py-4 text-on-surface-med">$ {{ linea.costo_por_persona|floatformat:2 }}</td>
+            <td class="px-stack-md py-4 text-right whitespace-nowrap">
+              <a href="{% url 'stock:lineareceta_delete' linea.pk %}" aria-label="Sacar de la receta" title="Sacar de la receta" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">restaurant_menu</span>
+              <p class="font-body-md text-body-md text-on-surface-med">Este menú todavía no tiene receta cargada.</p>
+              <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Con la receta vas a poder costear el cubierto y precargar el consumo de los eventos.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>{{ menu.lineas.all|length }} producto{{ menu.lineas.all|length|pluralize }}</span>
+      <span>Costo del cubierto: <span class="text-primary font-semibold">$ {{ menu.costo_por_persona|floatformat:2 }}</span></span>
+    </div>
+  </div>
+
+  <p class="font-body-sm text-body-sm text-on-surface-med">El costo se calcula con los precios de hoy: es para poner precio hacia adelante, no un histórico.</p>
+</section>
+
+<!-- ============================ Peligro ============================ -->
+<div class="flex justify-end">
+  <a href="{% url 'stock:menu_delete' menu.pk %}"
+     class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">delete</span><span>Eliminar menú</span>
+  </a>
+</div>
+
 {% endblock %}

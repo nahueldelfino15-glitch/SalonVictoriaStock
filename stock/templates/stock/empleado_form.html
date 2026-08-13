@@ -1,10 +1,45 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>{% if object %}Editar empleado{% else %}Nuevo empleado{% endif %}</h1>
-<form method="post">
+
+<div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+  <div class="mb-stack-lg">
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar empleado{% else %}Nuevo empleado{% endif %}</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">{% if object %}Actualizá los datos de la persona y guardá.{% else %}Cargá los datos de la persona y guardá.{% endif %}</p>
+  </div>
+
+  <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full [&_select]:w-full [&_textarea]:w-full">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Guardar</button>
-    <a href="{% url 'stock:empleado_list' %}" class="btn-accion btn-volver">Cancelar</a>
-</form>
+
+    {% if form.non_field_errors %}
+    <p class="font-body-sm text-body-sm text-error">{{ form.non_field_errors|striptags }}</p>
+    {% endif %}
+
+    <div class="flex flex-col gap-unit">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ form.nombre.id_for_label }}">Nombre</label>
+      {{ form.nombre }}
+      {% if form.nombre.errors %}<p class="font-body-sm text-body-sm text-error">{{ form.nombre.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ form.telefono.id_for_label }}">Teléfono</label>
+        {{ form.telefono }}
+        {% if form.telefono.errors %}<p class="font-body-sm text-body-sm text-error">{{ form.telefono.errors|striptags }}</p>{% endif %}
+      </div>
+
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ form.puesto_habitual.id_for_label }}">Puesto habitual</label>
+        {{ form.puesto_habitual }}
+        {% if form.puesto_habitual.errors %}<p class="font-body-sm text-body-sm text-error">{{ form.puesto_habitual.errors|striptags }}</p>{% endif %}
+        <p class="font-body-sm text-body-sm text-on-surface-med">Es el puesto que suele ocupar. En cada evento podés asignarle otro.</p>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+      <a href="{% url 'stock:empleado_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+      <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
+    </div>
+  </form>
+</div>
+
 {% endblock %}

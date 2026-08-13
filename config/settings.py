@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,12 +21,31 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-yhmo_cjge!e&)=v(y%sxfrtnbw5psvy%iek@w4rc%$r=m0xu^+'
+# En desarrollo usa la clave de siempre; en el servidor definir DJANGO_SECRET_KEY.
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-yhmo_cjge!e&)=v(y%sxfrtnbw5psvy%iek@w4rc%$r=m0xu^+',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Sigue en True por defecto para no romper el runserver local: en el servidor
+# definir DJANGO_DEBUG=False.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = []
+# Hosts permitidos, separados por coma. El default cubre el desarrollo local y
+# el cliente de tests; en el servidor definir DJANGO_ALLOWED_HOSTS.
+#
+# En produccion (ejemplo, PowerShell):
+#   $env:DJANGO_SECRET_KEY    = "<clave larga y secreta>"
+#   $env:DJANGO_DEBUG         = "False"
+#   $env:DJANGO_ALLOWED_HOSTS = "salonvictoria.com.ar,www.salonvictoria.com.ar"
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get(
+        'DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver'
+    ).split(',')
+    if h.strip()
+]
 
 
 # Application definition
@@ -38,17 +58,18 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'stock',
+]
 
- ]
-
-
-    
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Todo el sistema pide sesión. Una línea acá cubre las 40 vistas y las que
+    # vengan; con LoginRequiredMixin habría que acordarse en cada una. La vista
+    # de login y el admin quedan exentos por su cuenta.
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -103,12 +124,28 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# Autenticacion
+# https://docs.djangoproject.com/en/6.1/ref/settings/#auth
+# Se usan nombres de ruta con namespace (no paths hardcodeados): resolve_url()
+# los traduce, y si maniana cambia la URL no hay que tocar este archivo.
+
+# A donde manda LoginRequiredMixin / @login_required cuando no hay sesion.
+LOGIN_URL = 'stock:login'
+
+# A donde cae el usuario despues de ingresar, si no hay ?next=.
+LOGIN_REDIRECT_URL = 'stock:home'
+
+# A donde cae el usuario despues de cerrar sesion. Sin esto, LogoutView
+# renderizaria el template de deslogueo del admin, ajeno al diseno del sitio.
+LOGOUT_REDIRECT_URL = 'stock:login'
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
 
 LANGUAGE_CODE = 'es-ar'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
 USE_I18N = True
 
@@ -123,9 +160,10 @@ STATIC_URL = 'static/'
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
+#
+# Antes esto era un diccionario llamado MAILERS, que Django ignora por completo:
+# el setting real se llama EMAIL_BACKEND y es un string. Hoy el sistema no manda
+# ningun mail; con el backend de consola, si algun dia se manda uno, sale por la
+# terminal en vez de intentar conectarse a un SMTP inexistente.
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

@@ -4,18 +4,9 @@
 <div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
 
   <div class="mb-stack-lg">
-    <a href="{% url 'stock:evento_detail' evento.pk %}"
-       class="inline-flex items-center gap-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med hover:text-primary transition-colors mb-stack-md">
-      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
-      <span>Volver al evento</span>
-    </a>
-
-    <h1 class="font-headline-lg text-headline-lg text-on-surface-high flex items-center gap-stack-sm">
-      <span class="material-symbols-outlined text-primary text-[28px]">groups</span>
-      <span>Personal en {{ evento.nombre }}</span>
-    </h1>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar cargo{% else %}Nuevo cargo al cliente{% endif %}</h1>
     <p class="font-body-md text-body-md text-on-surface-med mt-unit">
-      {% if object %}Actualizá el puesto, las horas y el pago de esta persona.{% else %}Elegí a la persona y cargá el puesto, las horas y el pago de este evento.{% endif %}
+      Un adicional que se factura aparte del precio base de <strong class="text-on-surface-high">{{ evento.nombre }}</strong>: barra libre, DJ, horas extra.
     </p>
   </div>
 
@@ -44,16 +35,9 @@
       {% endfor %}
     </div>
 
-    <div class="flex flex-col-reverse sm:flex-row justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-      <a href="{% url 'stock:evento_detail' evento.pk %}"
-         class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
-        Cancelar
-      </a>
-      <button type="submit"
-              class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
-        <span>Guardar</span>
-        <span class="material-symbols-outlined text-[18px]">check</span>
-      </button>
+    <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+      <a href="{% url 'stock:evento_detail' evento.pk %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+      <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
     </div>
   </form>
 

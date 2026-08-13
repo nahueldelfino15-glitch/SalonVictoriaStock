@@ -4,13 +4,18 @@
 <div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
 
   <div class="mb-stack-lg">
-    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar producto{% else %}Nuevo producto{% endif %}</h1>
-    <p class="font-body-md text-body-md text-on-surface-med mt-unit">Completá los datos y guardá.</p>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Agregar a la receta</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      {% if menu %}
+      Cuánto de este producto se calcula <strong class="text-on-surface-high">por persona</strong> en el menú {{ menu.nombre }}.
+      {% else %}
+      Cuánto de este producto se calcula <strong class="text-on-surface-high">por persona</strong> en {{ evento.nombre }}.
+      {% endif %}
+    </p>
   </div>
 
-  <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full [&_select]:w-full [&_textarea]:w-full">
+  <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full [&_select]:w-full">
     {% csrf_token %}
-    <input type="hidden" name="next" value="{% firstof request.POST.next request.GET.next '' %}">
 
     {% if form.non_field_errors %}
     <div class="flex flex-col gap-unit border border-error/50 bg-error/10 rounded-lg px-stack-md py-stack-sm">
@@ -33,18 +38,14 @@
       {% endfor %}
     </div>
 
-    {% if object %}
     <div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-lg px-stack-md py-stack-sm">
-      <span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-[2px]">inventory_2</span>
-      <div>
-        <p class="font-body-md text-body-md text-on-surface">Stock actual: <strong class="text-on-surface-high">{{ object.stock_actual }} {{ object.unidad_medida }}</strong></p>
-        <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">El stock no se edita a mano. Se mueve solo con Compras, Consumo y Merma, así siempre queda el registro de por qué cambió.</p>
-      </div>
+      <span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-[2px]">info</span>
+      <p class="font-body-sm text-body-sm text-on-surface-med">La receta no descuenta stock por su cuenta: sirve para costear y para que el formulario de consumo te sugiera las cantidades.</p>
     </div>
-    {% endif %}
 
     <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
-      <a href="{% url 'stock:producto_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+      <a href="{% if menu %}{% url 'stock:menu_detail' menu.pk %}{% else %}{% url 'stock:consumo_evento' evento.pk %}{% endif %}"
+         class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
       <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
     </div>
   </form>

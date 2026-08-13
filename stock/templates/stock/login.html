@@ -1,0 +1,377 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Ingresar · Salón Victoria</title>
+<link rel="icon" type="image/png" href="{% static 'stock/img/LogoVictoria.png' %}">
+
+{% comment %}
+==============================================================================
+PANTALLA DE INGRESO — standalone A PROPÓSITO (no extiende stock/base.html).
+
+base.html renderiza el header y el nav mobile con links a las 8 secciones
+protegidas. Mostrarle ese menú a alguien que todavía no entró no tiene
+sentido: son links que le van a rebotar contra el login.
+
+Contrapartida: el bloque de abajo (fuentes + Tailwind CDN + tailwind.config +
+<style> de utilitarias) es una COPIA LITERAL de stock/base.html líneas 11-237.
+Si tocás la paleta, los radios, la tipografía o los estilos de formulario en
+base.html, HAY QUE REPLICARLO ACÁ. Es la única pantalla del proyecto con esta
+duplicación; si molesta, el paso siguiente es extraer ese bloque a un parcial
+(stock/_head_noir.html) e incluirlo desde los dos lados.
+==============================================================================
+{% endcomment %}
+
+<!-- ========================= Fuentes ========================= -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+<!-- ========================= Tailwind CDN ========================= -->
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          /* --- Superficies Material (tono cálido / oliva oscuro) --- */
+          "surface": "#16130b",
+          "surface-dim": "#16130b",
+          "surface-bright": "#3d392f",
+          "surface-container-lowest": "#110e07",
+          "surface-container-low": "#1f1b13",
+          "surface-container": "#231f17",
+          "surface-container-high": "#2d2a21",
+          "surface-container-highest": "#38342b",
+          "surface-variant": "#38342b",
+          "background": "#16130b",
+
+          /* --- Superficies "Noir Luxury" (negro puro) --- */
+          "surface-base": "#0a0a0a",
+          "surface-raised": "#161616",
+          "surface-overlay": "#242424",
+
+          /* --- Texto --- */
+          "on-surface": "#eae1d4",
+          "on-surface-variant": "#d0c5af",
+          "on-background": "#eae1d4",
+          "on-surface-high": "#ffffff",
+          "on-surface-med": "#a1a1a1",
+          "inverse-surface": "#eae1d4",
+          "inverse-on-surface": "#343027",
+
+          /* --- Bordes --- */
+          "outline": "#99907c",
+          "outline-variant": "#4d4635",
+
+          /* --- Oro (marca) --- */
+          "surface-tint": "#e9c349",
+          "primary": "#f2ca50",
+          "on-primary": "#3c2f00",
+          "primary-container": "#d4af37",
+          "on-primary-container": "#554300",
+          "inverse-primary": "#735c00",
+          "primary-fixed": "#ffe088",
+          "primary-fixed-dim": "#e9c349",
+          "on-primary-fixed": "#241a00",
+          "on-primary-fixed-variant": "#574500",
+          "gold-muted": "#735c00",
+
+          /* --- Secundario (grises) --- */
+          "secondary": "#c7c6c6",
+          "on-secondary": "#303030",
+          "secondary-container": "#464747",
+          "on-secondary-container": "#b6b5b4",
+          "secondary-fixed": "#e3e2e2",
+          "secondary-fixed-dim": "#c7c6c6",
+          "on-secondary-fixed": "#1b1c1c",
+          "on-secondary-fixed-variant": "#464747",
+
+          /* --- Terciario (azules) --- */
+          "tertiary": "#bfcdff",
+          "on-tertiary": "#082b72",
+          "tertiary-container": "#97b0ff",
+          "on-tertiary-container": "#254188",
+          "tertiary-fixed": "#dbe1ff",
+          "tertiary-fixed-dim": "#b4c5ff",
+          "on-tertiary-fixed": "#00174b",
+          "on-tertiary-fixed-variant": "#27438a",
+
+          /* --- Error --- */
+          "error": "#ffb4ab",
+          "on-error": "#690005",
+          "error-container": "#93000a",
+          "on-error-container": "#ffdad6"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem",
+          "pill": "9999px"
+        },
+        "spacing": {
+          "unit": "4px",
+          "stack-sm": "8px",
+          "stack-md": "16px",
+          "stack-lg": "24px",
+          "gutter": "24px",
+          "container-padding": "32px"
+        },
+        "fontFamily": {
+          "display-lg": ["Hanken Grotesk"],
+          "headline-lg": ["Hanken Grotesk"],
+          "headline-lg-mobile": ["Hanken Grotesk"],
+          "headline-md": ["Hanken Grotesk"],
+          "headline-sm": ["Hanken Grotesk"],
+          "body-lg": ["Hanken Grotesk"],
+          "body-md": ["Hanken Grotesk"],
+          "body-sm": ["Hanken Grotesk"],
+          "label-md": ["Hanken Grotesk"]
+        },
+        "fontSize": {
+          "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+          "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+          "headline-lg-mobile": ["28px", { "lineHeight": "34px", "fontWeight": "600" }],
+          "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+          "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "500" }],
+          "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+          "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+          "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+          "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  /* ==========================================================================
+     Victoria · Noir Luxury — clases utilitarias custom
+     Todo resuelto a hex literal: el CDN de Tailwind NO procesa theme() dentro
+     de un <style> plano.
+     Los selectores de formulario van prefijados con `html` a propósito: así le
+     ganan por especificidad al reset del plugin `forms` (que el CDN inyecta
+     DESPUÉS de este bloque). Para pisarlos desde una pantalla, usar el
+     modificador important de Tailwind: !bg-surface-base, !w-16, !border, etc.
+     ========================================================================== */
+
+  body { font-family: 'Hanken Grotesk', sans-serif; }
+
+  /* --- Material Symbols -------------------------------------------------- */
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .material-symbols-outlined.fill {
+    font-variation-settings: 'FILL' 1;
+  }
+
+  /* --- Sombra ambiental de la barra superior ----------------------------- */
+  .ambient-shadow {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+  }
+
+  /* --- Form Element Styling overrides for the dark luxury theme ---------- */
+  html input[type="text"],
+  html input[type="number"],
+  html input[type="date"],
+  html input[type="search"],
+  html input[type="tel"],
+  html input[type="email"],
+  html input[type="password"],
+  html input[type="url"],
+  html input[type="datetime-local"],
+  html select,
+  html textarea {
+    background-color: #161616;               /* colors.surface-raised   */
+    border: none;
+    border-bottom: 1px solid #38342b;        /* colors.surface-variant  */
+    color: #ffffff;                          /* colors.on-surface-high  */
+    border-radius: 0.125rem 0.125rem 0 0;    /* borderRadius.DEFAULT    */
+    padding: 8px 16px;                       /* spacing.stack-sm / .stack-md */
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  html input[type="text"]:focus,
+  html input[type="number"]:focus,
+  html input[type="date"]:focus,
+  html input[type="search"]:focus,
+  html input[type="tel"]:focus,
+  html input[type="email"]:focus,
+  html input[type="password"]:focus,
+  html input[type="url"]:focus,
+  html input[type="datetime-local"]:focus,
+  html select:focus,
+  html textarea:focus {
+    outline: none;
+    border-bottom-color: #f2ca50;            /* colors.primary          */
+    box-shadow: 0 1px 0 0 #f2ca50;           /* colors.primary          */
+    background-color: #242424;               /* colors.surface-overlay  */
+  }
+
+  html input::placeholder,
+  html textarea::placeholder { color: #a1a1a1; }   /* colors.on-surface-med */
+
+  html select option { background-color: #161616; color: #ffffff; }
+
+  /* Customize date picker icon color for dark mode */
+  ::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.7);
+  }
+
+  /* --- Botones ----------------------------------------------------------- */
+  .luxury-button-primary {
+    background-color: #f2ca50;               /* colors.primary          */
+    color: #0a0a0a;                          /* colors.surface-base     */
+    transition: all 0.2s ease;
+  }
+  .luxury-button-primary:hover {
+    background-color: #e9c349;               /* colors.primary-fixed-dim */
+    transform: translateY(-1px);
+  }
+
+  .luxury-button-secondary {
+    background-color: transparent;
+    color: #ffffff;                          /* colors.on-surface-high  */
+    border: 1px solid #38342b;               /* colors.surface-variant  */
+    transition: all 0.2s ease;
+  }
+  .luxury-button-secondary:hover {
+    border-color: #f2ca50;                   /* colors.primary          */
+    color: #f2ca50;
+  }
+
+  /* --- Scrollbar noir ---------------------------------------------------- */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #242424; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4d4635; }
+</style>
+
+<style>
+  /* ---- Sólo para esta pantalla ------------------------------------------
+     Le hace lugar al ojito de "ver contraseña" dentro del campo. El input lo
+     renderiza Django (widget PasswordInput), así que no le puedo colgar
+     clases de Tailwind sin tocar el form: se resuelve desde el contenedor.
+     ---------------------------------------------------------------------- */
+  .campo-clave input { padding-right: 48px; }
+</style>
+</head>
+
+<body class="bg-surface-base text-on-surface font-body-md text-body-md min-h-screen flex items-center justify-center px-stack-md py-container-padding selection:bg-primary-container selection:text-on-primary-container">
+
+<!-- Resplandor dorado de fondo (decorativo) -->
+<div aria-hidden="true" class="pointer-events-none fixed inset-0 z-0"
+     style="background: radial-gradient(70% 55% at 50% 0%, rgba(242,202,80,0.08) 0%, rgba(10,10,10,0) 70%);"></div>
+
+<main class="relative z-10 w-full max-w-[420px] flex flex-col gap-stack-lg">
+
+  <!-- ============================ Marca ============================ -->
+  <header class="flex flex-col items-center text-center gap-stack-sm">
+    <img alt="Salón Victoria" src="{% static 'stock/img/LogoVictoria.png' %}"
+         class="h-20 w-auto object-contain drop-shadow-[0_4px_20px_rgba(242,202,80,0.15)]">
+    <h1 class="font-display-lg text-headline-lg sm:text-display-lg text-on-surface-high leading-none">Salón Victoria</h1>
+    <p class="font-label-md text-label-md uppercase tracking-wider text-primary">Control de stock</p>
+  </header>
+
+  <!-- ============================ Tarjeta ============================ -->
+  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg shadow-2xl">
+
+    <div class="mb-stack-lg">
+      <h2 class="font-headline-md text-headline-md text-on-surface-high">Ingresar</h2>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Entrá con tu usuario para gestionar el salón.</p>
+    </div>
+
+    <form method="post" id="formLogin" class="flex flex-col gap-stack-lg [&_input]:w-full">
+      {% csrf_token %}
+
+      {% comment %}
+      El hidden `next` es OBLIGATORIO: LoginView lo mete en el contexto y, sin
+      él, el ?next= de la URL se pierde en el POST y el usuario siempre cae en
+      LOGIN_REDIRECT_URL en vez de volver a donde quería ir.
+      Ojo: este `next` es el de LoginView (RedirectURLMixin), no el `next` que
+      usan los forms embebidos de consumo/personal — son mecanismos distintos
+      que sólo comparten el nombre del campo.
+      {% endcomment %}
+      <input type="hidden" name="next" value="{{ next }}">
+
+      {% comment %}
+      A propósito NO imprimimos {{ form.non_field_errors }} tal cual: el texto
+      que trae Django es largo, técnico y habla de mayúsculas/minúsculas. Un
+      único mensaje genérico para CUALQUIER error (credenciales mal, cuenta
+      desactivada, campo vacío) además evita revelar si el usuario existe.
+      {% endcomment %}
+      {% if form.errors %}
+      <div role="alert" class="flex items-start gap-stack-sm border border-error/50 bg-error/10 rounded-lg px-stack-md py-stack-sm">
+        <span class="material-symbols-outlined text-[18px] text-error shrink-0 mt-[2px]">error</span>
+        <div class="font-body-sm text-body-sm">
+          <p class="text-error font-semibold">Usuario o contraseña incorrectos.</p>
+          <p class="text-on-surface-med mt-unit">Fijate que no tengas activado el bloqueo de mayúsculas y probá de nuevo.</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Usuario -->
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ form.username.id_for_label }}">Usuario</label>
+        {{ form.username }}
+      </div>
+
+      <!-- Contraseña -->
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ form.password.id_for_label }}">Contraseña</label>
+        <div class="relative campo-clave">
+          {{ form.password }}
+          <button type="button" id="verClave" aria-controls="{{ form.password.id_for_label }}"
+                  aria-pressed="false" aria-label="Mostrar contraseña" title="Mostrar contraseña"
+                  class="absolute right-stack-sm top-1/2 -translate-y-1/2 flex items-center justify-center h-9 w-9 rounded-pill text-on-surface-med hover:text-primary hover:bg-surface-overlay transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <span class="material-symbols-outlined text-[20px]" id="verClaveIcono">visibility</span>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit"
+              class="inline-flex items-center justify-center gap-stack-sm w-full luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-3 rounded active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised">
+        <span>Ingresar</span>
+        <span class="material-symbols-outlined text-[18px]">login</span>
+      </button>
+    </form>
+  </div>
+
+  <p class="text-center font-body-sm text-body-sm text-on-surface-med">
+    Acceso sólo para el personal del salón.<br>
+    ¿Te olvidaste la contraseña? Pedile una nueva al encargado.
+  </p>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var boton = document.getElementById('verClave');
+    var icono = document.getElementById('verClaveIcono');
+    var campo = document.getElementById('{{ form.password.id_for_label|escapejs }}');
+    if (!boton || !campo) { return; }
+
+    boton.addEventListener('click', function () {
+      var visible = campo.getAttribute('type') === 'password';
+      campo.setAttribute('type', visible ? 'text' : 'password');
+      boton.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      boton.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      boton.setAttribute('title', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      if (icono) { icono.textContent = visible ? 'visibility_off' : 'visibility'; }
+      campo.focus();
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,5 +1,10 @@
 ﻿venv/
 .venv/
-pycache/
+__pycache__/
 *.pyc
 .env
+
+# Backups de la base. db.sqlite3 sigue versionado a proposito: es el metodo de
+# sincronizacion actual del proyecto. Sacarlo del repo es una decision aparte.
+db.sqlite3.backup-*
+*.sqlite3-journal

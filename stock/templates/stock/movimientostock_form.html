@@ -1,10 +1,70 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>Consumo en "{{ evento.nombre }}"</h1>
-<form method="post">
+
+<div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+
+  <div class="mb-stack-lg">
+    {% if evento %}
+    <a href="{% url 'stock:evento_detail' evento.pk %}"
+       class="inline-flex items-center gap-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med hover:text-primary transition-colors mb-stack-md">
+      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+      <span>Volver al evento</span>
+    </a>
+    {% else %}
+    <a href="{% url 'stock:compras' %}"
+       class="inline-flex items-center gap-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med hover:text-primary transition-colors mb-stack-md">
+      <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+      <span>Volver a Compras</span>
+    </a>
+    {% endif %}
+
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high flex items-center gap-stack-sm">
+      <span class="material-symbols-outlined text-primary text-[28px]">{% if evento %}local_bar{% else %}shopping_cart{% endif %}</span>
+      <span>{% if evento %}Consumo en {{ evento.nombre }}{% else %}Movimiento de stock{% endif %}</span>
+    </h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      {% if not evento %}Este movimiento no está atado a ningún evento: es una carga de depósito.{% elif object %}Corregí el producto o la cantidad: el stock se recalcula solo.{% else %}Elegí el producto y la cantidad que se consumió en el evento.{% endif %}
+    </p>
+  </div>
+
+  <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full [&_select]:w-full [&_textarea]:w-full">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Guardar</button>
-    <a href="{% url 'stock:evento_detail' evento.pk %}" class="btn-accion btn-volver">Cancelar</a>
-</form>
+    <input type="hidden" name="next" value="{% firstof request.POST.next request.GET.next '' %}">
+
+    {% if form.non_field_errors %}
+    <div class="flex flex-col gap-unit border border-error/50 bg-error/10 rounded-lg px-stack-md py-stack-sm">
+      {% for error in form.non_field_errors %}
+      <p class="font-body-sm text-body-sm text-error flex items-start gap-stack-sm">
+        <span class="material-symbols-outlined text-[18px] shrink-0 mt-[2px]">error</span><span>{{ error }}</span>
+      </p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+      {% for field in form %}
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="font-body-sm text-body-sm text-on-surface-med">{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<p class="font-body-sm text-body-sm text-error">{{ field.errors|striptags }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex flex-col-reverse sm:flex-row justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+      <a href="{% if evento %}{% url 'stock:evento_detail' evento.pk %}{% else %}{% url 'stock:compras' %}{% endif %}"
+         class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+        Cancelar
+      </a>
+      <button type="submit"
+              class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+        <span>Guardar</span>
+        <span class="material-symbols-outlined text-[18px]">check</span>
+      </button>
+    </div>
+  </form>
+
+</div>
+
 {% endblock %}

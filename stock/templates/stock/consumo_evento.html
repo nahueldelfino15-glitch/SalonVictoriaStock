@@ -1,80 +1,181 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<div class="mb-4">
-    <h1>Consumo - {{ evento.nombre }}</h1>
-    <p class="text-muted">{{ evento.fecha }} · {{ evento.get_estado_display }}</p>
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Consumo del evento</p>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-unit">{{ evento.nombre }}</h1>
+    <div class="flex flex-wrap items-center gap-stack-sm mt-stack-sm">
+      <span class="font-body-md text-body-md text-on-surface-med">{{ evento.fecha|date:"d/m/Y" }}</span>
+      {% include 'stock/_chip_estado.html' with evento=evento %}
+    </div>
+  </div>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <a href="{% url 'stock:evento_detail' evento.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">visibility</span><span>Ver detalle del evento</span>
+    </a>
+  </div>
+</header>
+
+<!-- Botonera de pestañas -->
+<div data-tabs data-tab-default="#barra-pane" role="tablist" aria-label="Sectores"
+     class="flex border-b border-outline-variant gap-stack-md sm:gap-gutter overflow-x-auto">
+  <button type="button" id="barra-tab" role="tab" aria-controls="barra-pane" aria-selected="false" data-tab-target="#barra-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Barra</button>
+  <button type="button" id="cocina-tab" role="tab" aria-controls="cocina-pane" aria-selected="false" data-tab-target="#cocina-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Cocina</button>
+  <button type="button" id="extras-tab" role="tab" aria-controls="extras-pane" aria-selected="false" data-tab-target="#extras-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Extras</button>
+  <button type="button" id="personal-tab" role="tab" aria-controls="personal-pane" aria-selected="false" data-tab-target="#personal-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Personal</button>
+  <button type="button" id="receta-tab" role="tab" aria-controls="receta-pane" aria-selected="false" data-tab-target="#receta-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Receta</button>
 </div>
 
-<ul class="nav nav-tabs" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#barra-pane" type="button" role="tab">Barra</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#cocina-pane" type="button" role="tab">Cocina</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#extras-pane" type="button" role="tab">Extras</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#personal-pane" type="button" role="tab">Personal</button>
-    </li>
-</ul>
+<!-- Paneles -->
+<div id="barra-pane" data-tab-panel role="tabpanel" aria-labelledby="barra-tab">
+  {% include 'stock/_tabla_consumo.html' with productos=productos_barra evento=evento tab_id='barra-pane' %}
+</div>
 
-<div class="tab-content border border-top-0 p-3 mb-4">
-    <div class="tab-pane fade show active" id="barra-pane" role="tabpanel">
-        {% include 'stock/_tabla_consumo.html' with productos=productos_barra evento=evento tab_id='barra-pane' %}
-    </div>
-    <div class="tab-pane fade" id="cocina-pane" role="tabpanel">
-        {% include 'stock/_tabla_consumo.html' with productos=productos_cocina evento=evento tab_id='cocina-pane' %}
-    </div>
-    <div class="tab-pane fade" id="extras-pane" role="tabpanel">
-        {% include 'stock/_tabla_consumo.html' with productos=productos_extras evento=evento tab_id='extras-pane' %}
-    </div>
-    <div class="tab-pane fade" id="personal-pane" role="tabpanel">
-        <div class="tabla-wrapper">
-        <form method="post" action="{% url 'stock:personalevento_create' evento.pk %}" class="row g-2 align-items-end">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{% url 'stock:consumo_evento' evento.pk %}#personal-pane">
-            <div class="col-md-3">
-                <label class="form-label">Empleado</label>
-                <select name="empleado" class="form-select" required>
-                    {% for empleado in empleados %}
-                    <option value="{{ empleado.pk }}">{{ empleado.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Puesto</label>
-                <input type="text" name="puesto" class="form-control">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Horas</label>
-                <input type="number" step="0.5" name="horas_trabajadas" class="form-control">
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Pago</label>
-                <input type="number" step="0.01" name="pago" class="form-control">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-vino w-100">+ Agregar</button>
-            </div>
+<div id="cocina-pane" data-tab-panel role="tabpanel" aria-labelledby="cocina-tab" class="hidden">
+  {% include 'stock/_tabla_consumo.html' with productos=productos_cocina evento=evento tab_id='cocina-pane' %}
+</div>
+
+<div id="extras-pane" data-tab-panel role="tabpanel" aria-labelledby="extras-tab" class="hidden">
+  {% include 'stock/_tabla_consumo.html' with productos=productos_extras evento=evento tab_id='extras-pane' %}
+</div>
+
+<div id="receta-pane" data-tab-panel role="tabpanel" aria-labelledby="receta-tab" class="hidden">
+  <div class="flex flex-col gap-stack-md">
+
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
+      <div>
+        <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Receta de este evento</h2>
+        <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+          Calcula las cantidades para {{ evento.asistentes|default:0 }} persona{{ evento.asistentes|default:0|pluralize }} y te las deja precargadas en las pestañas de arriba. <strong class="text-on-surface">No descuenta stock por su cuenta.</strong>
+        </p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-stack-sm w-full sm:w-auto">
+        {% if evento.menu %}
+        <form method="post" action="{% url 'stock:evento_copiar_receta' evento.pk %}">
+          {% csrf_token %}
+          <button type="submit"
+                  class="w-full inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+            <span class="material-symbols-outlined text-[18px]">content_copy</span><span>Traer de {{ evento.menu.nombre }}</span>
+          </button>
         </form>
-        </div>
+        {% endif %}
+        <a href="{% url 'stock:lineareceta_create_evento' evento.pk %}"
+           class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar producto</span>
+        </a>
+      </div>
     </div>
+
+    <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+          <thead>
+            <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+              <th class="px-stack-md py-4 font-semibold">Producto</th>
+              <th class="px-stack-md py-4 font-semibold">Por persona</th>
+              <th class="px-stack-md py-4 font-semibold">Total sugerido</th>
+              <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-surface-overlay text-on-surface">
+            {% for item in evento.consumo_sugerido %}
+            <tr class="hover:bg-[#1C1C1C] transition-colors">
+              <td class="px-stack-md py-4 text-on-surface-high">{{ item.producto.nombre }}</td>
+              <td class="px-stack-md py-4 text-on-surface-med">{{ item.por_persona }} {{ item.producto.unidad_medida }}</td>
+              <td class="px-stack-md py-4 text-primary font-semibold">{{ item.cantidad }} {{ item.producto.unidad_medida }}</td>
+              <td class="px-stack-md py-4 text-right whitespace-nowrap">
+                {% for linea in evento.receta.all %}{% if linea.producto_id == item.producto.pk %}
+                <a href="{% url 'stock:lineareceta_delete' linea.pk %}" aria-label="Sacar de la receta" title="Sacar de la receta" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+                {% endif %}{% endfor %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="px-stack-md py-16 text-center">
+                <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">restaurant_menu</span>
+                <p class="font-body-md text-body-md text-on-surface-med">Este evento todavía no tiene receta.</p>
+                <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+                  {% if evento.menu %}Traé la de {{ evento.menu.nombre }} y ajustala, o cargá los productos a mano.{% else %}Asignale un menú al evento para traer su receta, o cargá los productos a mano.{% endif %}
+                </p>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+        <span>{{ evento.receta.all|length }} producto{{ evento.receta.all|length|pluralize }}</span>
+        <span>Costo estimado: <span class="text-primary font-semibold">$ {{ evento.costo_receta_estimado|floatformat:2 }}</span></span>
+      </div>
+    </div>
+
+  </div>
 </div>
 
-<a href="{% url 'stock:evento_detail' evento.pk %}" class="btn-accion btn-volver">Ver detalle completo del evento</a>
+<div id="personal-pane" data-tab-panel role="tabpanel" aria-labelledby="personal-tab" class="hidden">
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay p-stack-lg">
+    <div class="mb-stack-lg">
+      <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Asignar personal</h2>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Elegí al empleado, cargá el puesto de este evento y el pago.</p>
+    </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    var hash = window.location.hash;
-    if (hash) {
-        var triggerEl = document.querySelector('button[data-bs-target="' + hash + '"]');
-        if (triggerEl) {
-            var tab = new bootstrap.Tab(triggerEl);
-            tab.show();
-        }
-    }
-});
-</script>
+    {% if not empleados %}
+    <div class="bg-surface-base border border-surface-overlay rounded-xl py-16 px-stack-lg text-center">
+      <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">groups</span>
+      <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay personal cargado.</p>
+      <a href="{% url 'stock:empleado_list' %}"
+         class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap mt-stack-md">
+        <span class="material-symbols-outlined text-[18px]">groups</span><span>Cargá empleados primero</span>
+      </a>
+    </div>
+    {% else %}
+    <form method="post" action="{% url 'stock:personalevento_create' evento.pk %}" class="flex flex-col gap-stack-lg">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'stock:consumo_evento' evento.pk %}#personal-pane">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_empleado">Empleado</label>
+          <select name="empleado" id="id_empleado" required class="w-full font-body-md text-body-md">
+            <option value="">Elegí a la persona…</option>
+            {% for empleado in empleados %}
+            <option value="{{ empleado.pk }}">{{ empleado.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_puesto">Puesto</label>
+          <input type="text" name="puesto" id="id_puesto" class="w-full font-body-md text-body-md">
+        </div>
+
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_horas_trabajadas">Horas</label>
+          <input type="number" step="0.5" min="0" name="horas_trabajadas" id="id_horas_trabajadas" required class="w-full font-body-md text-body-md">
+        </div>
+
+        <div class="flex flex-col gap-unit">
+          <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="id_pago">Pago</label>
+          <input type="number" step="0.01" min="0" name="pago" id="id_pago" required class="w-full font-body-md text-body-md">
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-stack-md border-t border-surface-variant">
+        <button type="submit"
+                class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+          <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar</span>
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

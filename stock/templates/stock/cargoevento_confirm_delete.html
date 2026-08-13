@@ -5,30 +5,31 @@
 
   <span class="material-symbols-outlined text-error text-[40px]">warning</span>
 
-  <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">¿Querés eliminar este {% if object.evento %}consumo{% else %}movimiento{% endif %}?</h1>
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">¿Querés borrar este cargo?</h1>
 
   <p class="font-body-md text-body-md text-on-surface-med mt-stack-sm">
-    Vas a borrar <strong class="text-on-surface-high">{{ object.get_tipo_display }} x{{ object.cantidad }}</strong>
-    de <strong class="text-on-surface-high">{{ object.producto.nombre }}</strong>{% if object.evento %} en <strong class="text-on-surface-high">{{ object.evento.nombre }}</strong>{% else %} (carga de depósito, sin evento){% endif %}.
+    Vas a sacar <strong class="text-on-surface-high">{{ object.concepto }}</strong>
+    (<strong class="text-on-surface-high">$ {{ object.monto|floatformat:2 }}</strong>)
+    de <strong class="text-on-surface-high">{{ object.evento.nombre }}</strong>.
   </p>
 
   <div class="mt-stack-md rounded-lg border border-surface-overlay bg-surface-base px-stack-md py-stack-sm text-left">
     <p class="font-body-sm text-body-sm text-on-surface-med flex items-start gap-stack-sm">
       <span class="material-symbols-outlined text-primary text-[18px] shrink-0">info</span>
-      <span>El stock del producto se va a recalcular automáticamente.</span>
+      <span>Baja lo facturado del evento, así que su margen va a cambiar.</span>
     </p>
   </div>
 
   <form method="post" class="flex flex-col-reverse sm:flex-row justify-center gap-stack-md mt-stack-lg pt-stack-md border-t border-surface-variant">
     {% csrf_token %}
-    <a href="{% if object.evento %}{% url 'stock:evento_detail' object.evento.pk %}{% else %}{% url 'stock:compras' %}{% endif %}"
+    <a href="{% url 'stock:evento_detail' object.evento.pk %}"
        class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       Cancelar
     </a>
     <button type="submit"
             class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       <span class="material-symbols-outlined text-[18px]">delete</span>
-      <span>Sí, eliminar</span>
+      <span>Sí, borrar</span>
     </button>
   </form>
 

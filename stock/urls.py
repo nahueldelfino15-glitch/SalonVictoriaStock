@@ -1,4 +1,6 @@
-from django.urls import path 
+from django.contrib.auth import views as auth_views
+from django.urls import path
+
 from . import views
 
 app_name = 'stock'
@@ -6,17 +8,36 @@ app_name = 'stock'
 urlpatterns = [
     path('', views.home, name='home'),
 
+    # Autenticación con las vistas que ya trae Django: el único trabajo propio
+    # es el template. LogoutView solo acepta POST desde Django 5.
+    path('ingresar/', auth_views.LoginView.as_view(
+        template_name='stock/login.html',
+        redirect_authenticated_user=True,
+    ), name='login'),
+    path('salir/', auth_views.LogoutView.as_view(), name='logout'),
+
     path('productos/', views.ProductoListView.as_view(), name='producto_list'),
     path('productos/<int:pk>/', views.ProductoDetailView.as_view(), name='producto_detail'),
     path('productos/nuevo/', views.ProductoCreateView.as_view(), name='producto_create'),
     path('productos/<int:pk>/editar/', views.ProductoUpdateView.as_view(), name='producto_update'),
     path('productos/<int:pk>/eliminar/', views.ProductoDeleteView.as_view(), name='producto_delete'),
+    path('productos/<int:pk>/reactivar/', views.reactivar_producto, name='producto_reactivar'),
 
     path('eventos/', views.EventoListView.as_view(), name='evento_list'),
     path('eventos/<int:pk>/', views.EventoDetailView.as_view(), name='evento_detail'),
     path('eventos/nuevo/', views.EventoCreateView.as_view(), name='evento_create'),
     path('eventos/<int:pk>/editar/', views.EventoUpdateView.as_view(), name='evento_update'),
     path('eventos/<int:pk>/eliminar/', views.EventoDeleteView.as_view(), name='evento_delete'),
+    path('eventos/<int:pk>/reabrir/', views.reabrir_evento, name='evento_reabrir'),
+
+    path('eventos/<int:evento_pk>/cargos/nuevo/', views.CargoEventoCreateView.as_view(), name='cargoevento_create'),
+    path('cargos/<int:pk>/editar/', views.CargoEventoUpdateView.as_view(), name='cargoevento_update'),
+    path('cargos/<int:pk>/eliminar/', views.CargoEventoDeleteView.as_view(), name='cargoevento_delete'),
+
+    path('menus/<int:menu_pk>/receta/nueva/', views.LineaRecetaCreateView.as_view(), name='lineareceta_create_menu'),
+    path('eventos/<int:evento_pk>/receta/nueva/', views.LineaRecetaCreateView.as_view(), name='lineareceta_create_evento'),
+    path('receta/<int:pk>/eliminar/', views.LineaRecetaDeleteView.as_view(), name='lineareceta_delete'),
+    path('eventos/<int:pk>/receta/copiar/', views.copiar_receta, name='evento_copiar_receta'),
 
     path('empleados/', views.EmpleadoListView.as_view(), name='empleado_list'),
     path('empleados/<int:pk>/', views.EmpleadoDetailView.as_view(), name='empleado_detail'),
@@ -34,6 +55,7 @@ urlpatterns = [
     path('consumo/<int:pk>/eliminar/', views.MovimientoStockDeleteView.as_view(), name='movimientostock_delete'),
 
     path('compras/', views.compras, name='compras'),
+    path('merma/', views.merma, name='merma'),
     path('calendario/', views.calendario_eventos, name='calendario'),
 
     path('paquetes/', views.PaqueteListView.as_view(), name='paquete_list'),

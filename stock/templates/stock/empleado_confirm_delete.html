@@ -1,10 +1,37 @@
 {% extends 'stock/base.html' %}
 {% block content %}
-<h1>Eliminar empleado</h1>
-<p>¿Seguro que querés eliminar a <strong>{{ empleado.nombre }}</strong>? Esta acción no se puede deshacer.</p>
-<form method="post">
+{% with trabajados=empleado.eventos_trabajados.count %}
+
+<div class="w-full max-w-lg mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+  <div class="flex flex-col items-center text-center mb-stack-lg">
+    <span class="material-symbols-outlined text-error text-[40px]">warning</span>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">Eliminar empleado</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      ¿Seguro que querés eliminar a <span class="text-on-surface-high font-semibold">{{ empleado.nombre }}</span>? Esta acción no se puede deshacer.
+    </p>
+  </div>
+
+  <div class="flex items-start gap-stack-sm bg-surface-base border border-outline-variant rounded-xl p-stack-md mb-stack-lg">
+    <span class="material-symbols-outlined text-primary text-[20px] shrink-0">info</span>
+    <div class="font-body-sm text-body-sm text-on-surface">
+      {% if trabajados %}
+      <p><span class="text-error font-semibold">Ojo:</span> esta persona ya trabajó en {{ trabajados }} evento{{ trabajados|pluralize }}, así que el sistema <span class="text-on-surface-high font-semibold">no la va a dejar borrar</span>. Si apretás «Sí, eliminar» la operación falla y no se elimina nada.</p>
+      <p class="text-on-surface-med mt-unit">Si ya no trabaja más con nosotros, dejala cargada: su historial es parte de los gastos de esos eventos.</p>
+      {% else %}
+      <p>Esta persona todavía no trabajó en ningún evento, así que se puede eliminar sin problema.</p>
+      <p class="text-on-surface-med mt-unit">Ojo: una vez que trabajó en un evento, el sistema ya no la deja borrar, porque su pago es parte del gasto de ese evento.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" class="flex flex-col sm:flex-row justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
     {% csrf_token %}
-    <button type="submit" class="btn btn-danger">Sí, eliminar</button>
-    <a href="{% url 'stock:empleado_list' %}" class="btn btn-secondary">Cancelar</a>
-</form>
+    <a href="{% url 'stock:empleado_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+    <button type="submit" class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">delete</span><span>Sí, eliminar</span>
+    </button>
+  </form>
+</div>
+
+{% endwith %}
 {% endblock %}
