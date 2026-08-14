@@ -76,6 +76,8 @@ urlpatterns = [
     path('eventos/historial/', views.EventoHistorialListView.as_view(), name='evento_historial'),
     path('movimientos/', views.MovimientoStockListView.as_view(), name='movimiento_list'),
     path('eventos/<int:evento_pk>/consumo/nuevo/', views.MovimientoStockCreateView.as_view(), name='movimientostock_create'),
+    path('eventos/<int:evento_pk>/cierre-stock/', views.cierre_por_conteo, name='cierre_conteo'),
+    path('eventos/<int:evento_pk>/menu/<int:menu_pk>/', views.menu_del_evento, name='menu_del_evento'),
     path('consumo/<int:pk>/editar/', views.MovimientoStockUpdateView.as_view(), name='movimientostock_update'),
     path('consumo/<int:pk>/eliminar/', views.MovimientoStockDeleteView.as_view(), name='movimientostock_delete'),
 

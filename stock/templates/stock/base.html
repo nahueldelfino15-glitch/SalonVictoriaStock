@@ -305,7 +305,33 @@
     /* El panel lateral, la barra, los botones y los modales no se imprimen.
        Va por clase y no por etiqueta: los <header> de las pantallas (el titulo
        del evento) SI tienen que salir en el papel. */
-    .no-print, [data-modal], #modalRemoto { display: none !important; }
+    .no-print, [data-modal] { display: none !important; }
+
+    /* --- Imprimir DESDE un modal abierto -------------------------------
+       window.print() imprime el documento, y el modal es un overlay sobre la
+       pantalla anterior: apretar "Descargar PDF" en el detalle de un evento
+       abierto sobre la lista imprimia LA LISTA. Si hay un modal abierto, lo
+       que se imprime es su contenido y no lo que quedo atras.
+       El modal se oculta con la clase `hidden`, asi que :not(.hidden) es
+       exactamente "esta abierto".                                        */
+    body:has([data-modal]:not(.hidden)) main,
+    body:has([data-modal]:not(.hidden)) > aside,
+    body:has([data-modal]:not(.hidden)) > header { display: none !important; }
+
+    [data-modal]:not(.hidden) {
+      display: block !important;
+      position: static !important;
+      inset: auto !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      backdrop-filter: none !important;
+    }
+    [data-modal]:not(.hidden) > div {
+      max-width: none !important;
+      margin: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
 
     html, body {
       background: #ffffff !important;
@@ -547,9 +573,14 @@ prendería TODO el nav.
      class="hidden fixed inset-0 z-[100] items-start justify-center bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto">
   <div class="w-full max-w-3xl my-auto bg-surface-raised border border-surface-variant rounded-xl shadow-2xl relative">
     <button type="button" data-modal-close aria-label="Cerrar"
-            class="absolute top-stack-md right-stack-md z-10 text-on-surface-variant hover:text-primary transition-colors">
+            class="no-print absolute top-stack-md right-stack-md z-10 text-on-surface-variant hover:text-primary transition-colors">
       <span class="material-symbols-outlined">close</span>
     </button>
+    {# El membrete vive en <main>, que al imprimir desde el modal se esconde. #}
+    <div class="solo-impresion" style="border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
+      <strong style="font-size:13pt;">Salón Victoria</strong>
+      <span style="float:right;font-size:9pt;">Emitido el {% now "d/m/Y" %}</span>
+    </div>
     <div id="modalRemotoCuerpo" class="p-stack-lg"></div>
   </div>
 </div>
@@ -774,6 +805,17 @@ prendería TODO el nav.
     '  <div class="h-11 w-2/3 bg-surface-overlay rounded"></div>' +
     '</div>';
 
+  /* Navega de verdad, incluso si lo único que cambia es el #fragmento.
+     Guardar un producto de Limpieza redirige a /productos/#limpieza-pane. Si ya
+     estabas en /productos/, asignar location.href con la misma ruta SOLO cambia
+     el hash: no hay recarga, initTabs() no vuelve a correr, la pestaña se queda
+     en Barra y encima la tabla no muestra lo que acabás de guardar. */
+  function irA(url) {
+    var mismaPagina = url.split('#')[0] === window.location.href.split('#')[0];
+    window.location.href = url;
+    if (mismaPagina) { window.location.reload(); }
+  }
+
   function initModalRemoto() {
     var modal = document.getElementById('modalRemoto');
     var cuerpo = document.getElementById('modalRemotoCuerpo');
@@ -842,7 +884,7 @@ prendería TODO el nav.
           if (r.redirected) {
             // El fragmento del modal no imprime los mensajes de Django, así que
             // siguen en la sesión y los muestra la pantalla a la que vamos.
-            window.location.href = r.url;
+            irA(r.url);
             return null;
           }
           return r.text();

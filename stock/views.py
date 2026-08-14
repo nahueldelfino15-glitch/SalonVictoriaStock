@@ -1262,6 +1262,150 @@ def consumo_evento(request, evento_pk):
     return render(request, 'stock/consumo_evento.html', context)
 
 
+def menu_del_evento(request, evento_pk, menu_pk):
+    """Qué productos hacen falta para servir ESTE menú en ESTE evento (RN-31).
+
+    Las porciones salen del evento (las tarjetas, o los asistentes), así que la
+    misma pantalla dice distinto según a qué evento cuelgue: 80 raciones del
+    adulto acá, 30 en la fiesta de al lado.
+    """
+    evento = get_object_or_404(Evento, pk=evento_pk)
+    menu = get_object_or_404(Menu, pk=menu_pk)
+
+    porciones = 0
+    for item in evento.menus_del_evento:
+        if item['menu'].pk == menu.pk:
+            porciones = item['porciones']
+            break
+
+    return render(request, 'stock/menu_del_evento.html', {
+        'evento': evento,
+        'menu': menu,
+        'porciones': porciones,
+        'ingredientes': menu.necesita_para(porciones),
+        'platos_por_paso': menu.platos_por_paso,
+    })
+
+
+def cierre_por_conteo(request, evento_pk):
+    """Cargás lo que QUEDÓ y el sistema calcula lo que salió (RN-30).
+
+    Es como se cuenta de verdad al terminar una fiesta: nadie anota botella por
+    botella mientras sirve, se cuenta el sobrante en el depósito. Antes había que
+    hacer la resta a mano por cada producto y cargar el resultado, que es donde
+    aparecen los errores.
+
+        consumido = stock del sistema − lo contado
+
+    Va en dos pasos a propósito. El primero muestra qué se va a registrar y el
+    segundo lo escribe: esto mueve el libro mayor de verdad, y un cero de más en
+    un input no puede descontar 200 botellas sin que nadie lo vea antes.
+    """
+    evento = get_object_or_404(Evento, pk=evento_pk)
+
+    if evento.cerrado:
+        messages.error(
+            request,
+            f'"{evento.nombre}" está finalizado, así que no acepta más carga de consumo. '
+            'Reabrilo si te falta corregir algo.',
+        )
+        return redirect('stock:evento_detail', pk=evento.pk)
+
+    context = productos_por_sector()
+    context['evento'] = evento
+
+    if request.method != 'POST':
+        return render(request, 'stock/cierre_conteo.html', context)
+
+    contados, lineas, avisos = _leer_conteo(request.POST)
+
+    if not lineas and not avisos:
+        messages.error(request, 'No cargaste ningún conteo. Poné cuánto quedó de al menos un producto.')
+        return redirect('stock:cierre_conteo', evento_pk=evento.pk)
+
+    # Paso 2: ya vio el resumen y confirmó.
+    if request.POST.get('confirmar'):
+        with transaction.atomic():
+            for linea in lineas:
+                MovimientoStock.objects.create(
+                    producto=linea['producto'],
+                    evento=evento,
+                    tipo='salida',
+                    cantidad=linea['consumido'],
+                )
+        messages.success(
+            request,
+            f'Registramos el consumo de {len(lineas)} producto'
+            f'{"s" if len(lineas) != 1 else ""} en "{evento.nombre}".',
+        )
+        return redirect('stock:evento_detail', pk=evento.pk)
+
+    # Paso 1: el resumen de lo que se va a descontar.
+    context['lineas'] = lineas
+    context['avisos'] = avisos
+    context['contados'] = contados
+    context['total'] = sum(linea['costo'] for linea in lineas)
+    return render(request, 'stock/cierre_conteo_confirmar.html', context)
+
+
+def _leer_conteo(datos):
+    """El POST del conteo -> (lo tecleado, lo que se va a descontar, los avisos).
+
+    Un producto que se deja **vacío** no se cuenta: obligar a contar el depósito
+    entero para cargar tres cosas sería peor que no tener la pantalla. Vacío no
+    es cero — cero significa "no quedó nada".
+    """
+    contados, lineas, avisos = {}, [], []
+
+    for clave, valor in datos.items():
+        if not clave.startswith('contado_'):
+            continue
+        if not (valor or '').strip():
+            continue
+
+        producto = Producto.objects.filter(pk=clave[len('contado_'):], activo=True).first()
+        if producto is None:
+            continue
+
+        contados[producto.pk] = valor
+        queda = parsear_cantidad(valor)
+
+        if queda is None or queda < 0:
+            avisos.append({
+                'producto': producto,
+                'texto': f'"{valor}" no es una cantidad. Ese producto quedó sin registrar.',
+            })
+            continue
+
+        if queda > producto.stock_actual:
+            # Contar MÁS de lo que el sistema dice no es consumo: es que faltaba
+            # cargar una compra, o que el stock venía mal. Registrarlo como
+            # salida negativa inventaría mercadería.
+            avisos.append({
+                'producto': producto,
+                'texto': (
+                    f'Contaste {queda:g} pero el sistema tiene {producto.stock_actual:g}. '
+                    'Eso no es consumo: fijate si falta cargar una compra.'
+                ),
+            })
+            continue
+
+        consumido = producto.stock_actual - queda
+        if not consumido:
+            continue        # no se movió: no hay nada que asentar
+
+        lineas.append({
+            'producto': producto,
+            'habia': producto.stock_actual,
+            'queda': queda,
+            'consumido': consumido,
+            'costo': consumido * (producto.precio_unitario or 0),
+        })
+
+    lineas.sort(key=lambda linea: linea['producto'].nombre.lower())
+    return contados, lineas, avisos
+
+
 # ---------- Usuarios del sistema (solo el administrador) ----------
 class UsuarioCreationForm(UserCreationForm):
     """El alta de Django, más el rol.

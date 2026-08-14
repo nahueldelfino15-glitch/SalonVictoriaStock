@@ -1,0 +1,89 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Cierre de stock por conteo</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      {{ evento.nombre }} · {{ evento.fecha|date:"d/m/Y" }}
+    </p>
+  </div>
+
+  <a href="{% url 'stock:consumo_evento' evento.pk %}"
+     class="no-print inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">edit_note</span><span>Cargar a mano</span>
+  </a>
+</header>
+
+<div class="flex items-start gap-stack-sm border border-primary/40 bg-primary/5 rounded-xl px-stack-md py-stack-sm">
+  <span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-[2px]">inventory</span>
+  <div>
+    <p class="font-body-md text-body-md text-on-surface-high">Contá lo que te quedó y el sistema calcula lo que salió.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+      Poné <strong>cuánto quedó</strong> de cada producto después del evento. Lo que dejes
+      <strong>vacío</strong> no se toca. Antes de descontar nada te vamos a mostrar el resumen.
+    </p>
+  </div>
+</div>
+
+<form method="post" class="flex flex-col gap-stack-lg w-full">
+  {% csrf_token %}
+
+  <div data-tabs class="flex gap-unit border-b border-surface-overlay overflow-x-auto">
+    {% for sector in sectores %}
+    <button type="button" data-tab-target="#{{ sector.clave }}-pane"
+            class="shrink-0 px-stack-md py-stack-sm font-label-md text-label-md uppercase tracking-wider border-b-2 border-transparent text-on-surface-med hover:text-primary transition-colors data-[activo]:border-primary data-[activo]:text-primary">
+      {{ sector.etiqueta }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {% for sector in sectores %}
+  <div id="{{ sector.clave }}-pane" data-tab-panel class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Producto</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Hay en sistema</th>
+            <th class="px-stack-md py-4 font-semibold text-right">¿Cuánto quedó?</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for producto in sector.productos %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors">
+            <td class="px-stack-md py-4 font-body-md text-body-md text-on-surface-high">{{ producto.nombre }}</td>
+            <td class="px-stack-md py-4 text-right text-on-surface-med">{{ producto.stock_actual|floatformat:"-2" }} {{ producto.unidad_medida }}</td>
+            <td class="px-stack-md py-4 text-right">
+              <label class="sr-only" for="contado-{{ producto.pk }}">Cuánto quedó de {{ producto.nombre }}</label>
+              <input type="number" step="0.01" min="0" inputmode="decimal"
+                     name="contado_{{ producto.pk }}" id="contado-{{ producto.pk }}"
+                     placeholder="—"
+                     class="w-[120px] text-right font-body-sm text-body-sm">
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inventory_2</span>
+              <p class="font-body-md text-body-md text-on-surface-med">No hay productos cargados en {{ sector.etiqueta|lower }}.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="no-print flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+    <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:evento_detail' evento.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+    <button type="submit"
+            class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95">
+      <span>Calcular consumo</span><span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+    </button>
+  </div>
+</form>
+
+{% endblock %}

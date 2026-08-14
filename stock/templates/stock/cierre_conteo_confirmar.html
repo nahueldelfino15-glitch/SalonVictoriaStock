@@ -1,0 +1,94 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<header class="w-full">
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Esto se va a descontar</h1>
+  <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+    {{ evento.nombre }} · {{ evento.fecha|date:"d/m/Y" }}
+  </p>
+</header>
+
+{% if avisos %}
+<div class="flex flex-col gap-stack-sm border border-error/50 bg-error/10 rounded-xl px-stack-md py-stack-sm">
+  <p class="font-body-md text-body-md text-on-surface-high flex items-start gap-stack-sm">
+    <span class="material-symbols-outlined text-[20px] text-error shrink-0 mt-[2px]">error</span>
+    <span>Estos quedaron <strong>sin registrar</strong>:</span>
+  </p>
+  <ul class="flex flex-col gap-unit pl-stack-lg">
+    {% for aviso in avisos %}
+    <li class="font-body-sm text-body-sm text-on-surface">
+      <strong class="text-on-surface-high">{{ aviso.producto.nombre }}</strong> — {{ aviso.texto }}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if lineas %}
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Producto</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Había</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Quedó</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Se consumió</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Costo</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for linea in lineas %}
+        <tr>
+          <td class="px-stack-md py-4 font-body-md text-body-md text-on-surface-high">{{ linea.producto.nombre }}</td>
+          <td class="px-stack-md py-4 text-right text-on-surface-med">{{ linea.habia|floatformat:"-2" }}</td>
+          <td class="px-stack-md py-4 text-right text-on-surface-med">{{ linea.queda|floatformat:"-2" }}</td>
+          <td class="px-stack-md py-4 text-right font-body-md text-body-md text-primary font-semibold">
+            {{ linea.consumido|floatformat:"-2" }} {{ linea.producto.unidad_medida }}
+          </td>
+          <td class="px-stack-md py-4 text-right text-on-surface-med">
+            {% if linea.producto.valoriza %}$ {{ linea.costo|floatformat:2 }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="border-t border-outline-variant bg-surface-container">
+          <td colspan="4" class="px-stack-md py-4 font-label-md text-label-md text-primary uppercase tracking-wider text-right">Costo del consumo</td>
+          <td class="px-stack-md py-4 text-right font-body-md text-body-md text-primary font-semibold">$ {{ total|floatformat:2 }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-xl px-stack-md py-stack-sm">
+  <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">info</span>
+  <p class="font-body-sm text-body-sm text-on-surface-med">
+    No hay nada para descontar: lo que contaste coincide con lo que el sistema ya tenía.
+  </p>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'stock:cierre_conteo' evento.pk %}"
+      class="no-print flex flex-col-reverse sm:flex-row justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+  {% csrf_token %}
+  {# El conteo tecleado viaja de vuelta: sin esto, "Corregir" perdería todo. #}
+  {% for pk, valor in contados.items %}
+  <input type="hidden" name="contado_{{ pk }}" value="{{ valor }}">
+  {% endfor %}
+
+  <a href="{% url 'stock:cierre_conteo' evento.pk %}"
+     class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+    <span class="material-symbols-outlined text-[18px]">arrow_back</span><span>Volver a contar</span>
+  </a>
+
+  {% if lineas %}
+  <button type="submit" name="confirmar" value="1"
+          class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+    <span class="material-symbols-outlined text-[18px]">check</span><span>Confirmar y descontar</span>
+  </button>
+  {% endif %}
+</form>
+
+{% endblock %}

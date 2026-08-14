@@ -17,6 +17,10 @@ PANTALLAS_DEL_EMPLEADO = frozenset({
     'calendario',
     'consumo_selector',
     'consumo_evento',
+    # Contar el sobrante al terminar la fiesta es justo lo que hace el mozo
+    # (RN-30). Es carga de consumo por otro camino, no una pantalla nueva de
+    # administración: sin esto tendría que hacer la resta a mano.
+    'cierre_conteo',
     # El POST de cada renglón de la tabla de consumo: sin esto la pantalla se
     # ve pero el botón "Agregar" rebota, que es peor que no tenerla.
     'movimientostock_create',

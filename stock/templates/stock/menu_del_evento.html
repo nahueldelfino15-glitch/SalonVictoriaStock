@@ -1,0 +1,74 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{{ menu.nombre }}</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      Lo que hace falta para <strong class="text-primary">{{ porciones }}</strong>
+      porcion{{ porciones|pluralize:"es" }} en {{ evento.nombre }}.
+    </p>
+  </div>
+  {% include 'stock/_boton_pdf.html' %}
+</header>
+
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Producto</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Por persona</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Hace falta</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Hay en stock</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for item in ingredientes %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors">
+          <td class="px-stack-md py-4 font-body-md text-body-md text-on-surface-high">{{ item.producto.nombre }}</td>
+          <td class="px-stack-md py-4 text-right text-on-surface-med">{{ item.por_persona|floatformat:"-3" }} {{ item.producto.unidad_medida }}</td>
+          <td class="px-stack-md py-4 text-right font-body-md text-body-md text-primary font-semibold">{{ item.cantidad|floatformat:"-2" }} {{ item.producto.unidad_medida }}</td>
+          <td class="px-stack-md py-4 text-right {% if item.producto.stock_actual < item.cantidad %}text-error{% else %}text-on-surface-med{% endif %}">
+            {{ item.producto.stock_actual|floatformat:"-2" }}
+            {% if item.producto.stock_actual < item.cantidad %}
+            <span class="block font-body-sm text-body-sm">faltan {{ item.cantidad|floatformat:"-2" }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">restaurant</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Este menú todavía no tiene receta cargada.</p>
+            <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+              Cargala desde <a data-modal-link href="{% url 'stock:menu_detail' menu.pk %}" class="text-primary hover:underline">el menú</a>,
+              plato por plato, con la cantidad por persona.
+            </p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if platos_por_paso %}
+<section class="flex flex-col gap-stack-md">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Los platos</h2>
+  <div class="grid-datos">
+    {% for grupo in platos_por_paso %}
+    <div class="bg-surface-raised rounded-xl border border-surface-overlay p-stack-md flex flex-col gap-unit">
+      <span class="font-label-md text-label-md text-primary uppercase tracking-wider">{{ grupo.etiqueta }}</span>
+      {% for plato in grupo.platos %}
+      <span class="font-body-md text-body-md text-on-surface-high">{{ plato.nombre }}</span>
+      {% empty %}
+      <span class="font-body-sm text-body-sm text-on-surface-med italic">—</span>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

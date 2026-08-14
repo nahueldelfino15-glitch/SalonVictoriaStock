@@ -347,6 +347,64 @@
   </div>
 </section>
 
+<!-- ===================== Menús del evento (RN-31) ===================== -->
+<section class="flex flex-col gap-stack-md w-full">
+  <div>
+    <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Menús del evento</h2>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+      Lo que se sirve y cuánta gente come de cada uno. El botón abre lo que hace falta comprar.
+    </p>
+  </div>
+
+  {% with menus=evento.menus_del_evento %}
+  {% if menus %}
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Menú</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Porciones</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Costo del cubierto</th>
+            <th class="col-acciones px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for item in menus %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors group">
+            <td class="px-stack-md py-4 font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ item.menu.nombre }}</td>
+            <td class="px-stack-md py-4 text-right">
+              <span class="font-body-md text-body-md text-primary font-semibold">{{ item.porciones }}</span>
+              <span class="block font-body-sm text-body-sm text-on-surface-med">
+                {% if item.por_tarjeta %}según las tarjetas{% else %}por los asistentes{% endif %}
+              </span>
+            </td>
+            <td class="px-stack-md py-4 text-right text-on-surface-med">$ {{ item.menu.costo_por_persona|floatformat:2 }}</td>
+            <td class="col-acciones px-stack-md py-4 text-right whitespace-nowrap">
+              <a data-modal-link href="{% url 'stock:menu_del_evento' evento.pk item.menu.pk %}"
+                 class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-md py-stack-sm rounded whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">shopping_basket</span><span>Qué hace falta</span>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-xl px-stack-md py-stack-sm">
+    <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">restaurant_menu</span>
+    <p class="font-body-sm text-body-sm text-on-surface-med">
+      Este evento no tiene ningún menú asignado. Podés ponerle uno a cada
+      <a data-modal-link href="{% url 'stock:tarjetaevento_create' evento.pk %}" class="text-primary hover:underline">tarjeta</a>,
+      o uno general desde <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" class="text-primary hover:underline">editar evento</a>.
+    </p>
+  </div>
+  {% endif %}
+  {% endwith %}
+</section>
+
 <!-- ===================== Cargos al cliente ===================== -->
 <section class="flex flex-col gap-stack-md w-full">
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">

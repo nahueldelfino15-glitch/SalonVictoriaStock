@@ -119,13 +119,32 @@ Acá está el cálculo de plata. Es lo más importante de esta tanda.
       Abre el diálogo de impresión: elegí **"Guardar como PDF"** como destino.
       En el papel no salen ni el menú ni los botones, y va en negro sobre blanco.
 
-### 8. Puestos
+### 8. Cierre de stock por conteo
+Así se cuenta de verdad: al terminar la fiesta contás lo que sobró, no lo que salió.
+
+- [ ] **Consumo** → elegí el evento → botón **"Cerrar por conteo"**.
+- [ ] Tenés 20 Cocas y te quedaron 15: poné **15**. Dale a "Calcular consumo".
+- [ ] Te muestra **"se consumió 5"** antes de tocar nada. Ahí confirmás.
+- [ ] Verificá que el stock bajó a 15 y que las 5 aparecen en el consumo del evento.
+- [ ] **Lo que dejás vacío no se toca.** Vacío es "no lo conté"; **0** es "no quedó nada".
+- [ ] Probá poner **más de lo que hay** (25 sobre 20): te avisa y no registra nada.
+      Eso no es consumo, es que falta cargar una compra.
+
+### 9. Menús del evento
+- [ ] En el **detalle del evento**, después de Personal asignado, está **Menús del evento**
+      con cuánta gente come de cada uno.
+- [ ] Con dos tarjetas de menús distintos, tiene que decir 80 y 20, no 100 y 100.
+- [ ] Botón **"Qué hace falta"** → los productos y cantidades para esas porciones.
+      Lo que no alcanza en stock sale en rojo.
+- [ ] Cambiale los asistentes al evento (sin tarjetas): las porciones se recalculan solas.
+
+### 10. Puestos
 - [ ] **Puestos** → la lista la administrás vos. Vienen cargados Mozo, Barman, Cocina,
       Dj, Limpieza, Seguridad y Otro; agregá uno nuevo (ej. "Valet").
 - [ ] Intentá **borrar un puesto que esté usado** en algún evento: te tiene que frenar.
       Es historial de pagos, no se puede dejar sin etiqueta lo ya liquidado.
 
-### 9. Recetas
+### 11. Recetas
 La receta se carga **solo en el menú**, organizada en platos. El evento la hereda.
 
 - [ ] **Menús** → entrá a un menú → en cada paso (Entrante / Plato principal / Plato
@@ -144,7 +163,7 @@ La receta se carga **solo en el menú**, organizada en platos. El evento la here
 - [ ] Si un producto está en **dos platos**, tiene que aparecer **una sola vez** en
       consumo, con las cantidades sumadas.
 
-### 10. Modales y menú lateral
+### 12. Modales y menú lateral
 - [ ] El menú de la izquierda **colapsa** con el botón ☰ de arriba. Cerrá el navegador,
       volvé a entrar: tiene que **acordarse** de cómo lo dejaste.
 - [ ] Cualquier **ver / editar / eliminar** de una tabla abre un **modal**, sin cambiar
@@ -154,13 +173,13 @@ La receta se carga **solo en el menú**, organizada en platos. El evento la here
 - [ ] Abrí uno de esos links con **Ctrl+click**: tiene que abrir la pantalla completa
       en otra pestaña. El modal es una comodidad, no un requisito.
 
-### 11. Cierre de evento
+### 13. Cierre de evento
 - [ ] Editá el evento y ponelo en **Finalizado**.
 - [ ] Intentá cargarle consumo: no te tiene que dejar.
 - [ ] En el detalle del evento aparece **"Reabrir evento"**. Usalo y probá que ahora sí deja.
 - [ ] Fijate que queda la marca de "Reabierto el ...".
 
-### 12. Recordatorios por mail
+### 14. Recordatorios por mail
 - [ ] **Avisos** (menú lateral) → agregá uno o más destinatarios. Podés silenciar a
       alguien sin borrarlo (destildá "activo").
 - [ ] Probá sin mandar nada:
@@ -201,7 +220,7 @@ Ojo: solo manda si la PC está prendida a esa hora. Si un día estuvo apagada, e
 **no se pierde** — el comando trabaja con una ventana de días, así que sale en la
 próxima corrida.
 
-### 13. Que el pasado no se mueva
+### 15. Que el pasado no se mueva
 Esto es lo más importante del sistema, y lo más fácil de romper:
 
 - [ ] Anotá el **costo** de un evento que ya tenga consumo cargado.
@@ -249,12 +268,12 @@ No está corrido a propósito. En una base real conviene contar el depósito ant
 python manage.py test stock
 ```
 
-Son **212** y tienen que pasar todos. Cubren la aritmética del stock, la validación
+Son **230** y tienen que pasar todos. Cubren la aritmética del stock, la validación
 de faltantes, la merma, el congelamiento de costos, el margen, las recetas por plato,
 el catálogo de puestos, las tarjetas, los recordatorios por mail y que los
 modales no se coman los mensajes.
 
 ## Dónde está la documentación técnica
 
-En [CLAUDE.md](CLAUDE.md): modelo de datos, las 29 reglas de negocio, las trampas
+En [CLAUDE.md](CLAUDE.md): modelo de datos, las 31 reglas de negocio, las trampas
 conocidas y la deuda técnica pendiente.

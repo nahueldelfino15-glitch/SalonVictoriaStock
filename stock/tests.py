@@ -2192,6 +2192,222 @@ class UnidadesDeMedidaTests(TestCase):
         self.assertEqual(f'{producto.stock_actual:.0f} {producto.unidad_medida}', '5 Litros')
 
 
+class CierrePorConteoTests(TestCase):
+    """RN-30: se carga lo que QUEDO y el sistema calcula lo que salio."""
+
+    def setUp(self):
+        self.usuario = User.objects.create_user('admin', password='x-1234', is_staff=True)
+        self.client.force_login(self.usuario)
+        self.evento = Evento.objects.create(
+            nombre='Boda', fecha=date(2026, 9, 1), asistentes=100
+        )
+        self.coca = Producto.objects.create(
+            nombre='Coca 1.5L', sector='barra', precio_unitario=1000,
+            stock_actual=20, unidad_medida=una_unidad(),
+        )
+        self.vino = Producto.objects.create(
+            nombre='Vino', sector='barra', precio_unitario=5000,
+            stock_actual=30, unidad_medida=una_unidad(),
+        )
+
+    def url(self):
+        return reverse('stock:cierre_conteo', kwargs={'evento_pk': self.evento.pk})
+
+    def test_el_ejemplo_del_dueno_20_menos_15_son_5(self):
+        respuesta = self.client.post(self.url(), {f'contado_{self.coca.pk}': '15'})
+
+        linea = respuesta.context['lineas'][0]
+        self.assertEqual(linea['producto'], self.coca)
+        self.assertEqual(linea['habia'], 20)
+        self.assertEqual(linea['queda'], 15)
+        self.assertEqual(linea['consumido'], 5)
+
+    def test_el_primer_post_no_toca_el_stock(self):
+        """Muestra el resumen; recien el segundo escribe."""
+        self.client.post(self.url(), {f'contado_{self.coca.pk}': '15'})
+
+        self.coca.refresh_from_db()
+        self.assertEqual(self.coca.stock_actual, 20, 'todavia no confirmo nada')
+        self.assertEqual(MovimientoStock.objects.count(), 0)
+
+    def test_al_confirmar_descuenta_y_queda_en_el_consumo_del_evento(self):
+        self.client.post(self.url(), {f'contado_{self.coca.pk}': '15', 'confirmar': '1'})
+
+        self.coca.refresh_from_db()
+        self.assertEqual(self.coca.stock_actual, 15)
+
+        movimiento = self.evento.movimientos.get()
+        self.assertEqual(movimiento.producto, self.coca)
+        self.assertEqual(movimiento.tipo, 'salida')
+        self.assertEqual(movimiento.cantidad, 5)
+        self.assertEqual(self.evento.gasto_stock, 5000, '5 cocas x $1.000')
+
+    def test_lo_que_se_deja_vacio_no_se_toca(self):
+        """Obligar a contar el deposito entero para cargar tres cosas seria peor
+        que no tener la pantalla."""
+        self.client.post(self.url(), {
+            f'contado_{self.coca.pk}': '15',
+            f'contado_{self.vino.pk}': '',
+            'confirmar': '1',
+        })
+
+        self.vino.refresh_from_db()
+        self.assertEqual(self.vino.stock_actual, 30, 'sin contar, sin tocar')
+        self.assertEqual(MovimientoStock.objects.count(), 1)
+
+    def test_cero_no_es_vacio(self):
+        """Vacio es 'no lo conte'; cero es 'no quedo nada'."""
+        self.client.post(self.url(), {f'contado_{self.coca.pk}': '0', 'confirmar': '1'})
+
+        self.coca.refresh_from_db()
+        self.assertEqual(self.coca.stock_actual, 0)
+        self.assertEqual(self.evento.movimientos.get().cantidad, 20)
+
+    def test_contar_lo_mismo_que_hay_no_genera_movimiento(self):
+        self.client.post(self.url(), {f'contado_{self.coca.pk}': '20', 'confirmar': '1'})
+        self.assertEqual(MovimientoStock.objects.count(), 0, 'no se movio nada')
+
+    def test_contar_mas_de_lo_que_hay_avisa_y_no_inventa_mercaderia(self):
+        """Contar 25 sobre 20 no es consumo negativo: es que falta una compra."""
+        respuesta = self.client.post(self.url(), {f'contado_{self.coca.pk}': '25'})
+
+        self.assertEqual(respuesta.context['lineas'], [])
+        aviso = respuesta.context['avisos'][0]
+        self.assertEqual(aviso['producto'], self.coca)
+        self.assertIn('no es consumo', aviso['texto'])
+
+        self.coca.refresh_from_db()
+        self.assertEqual(self.coca.stock_actual, 20)
+
+    def test_texto_en_vez_de_numero_avisa_y_no_revienta(self):
+        respuesta = self.client.post(self.url(), {f'contado_{self.coca.pk}': 'como diez'})
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.context['lineas'], [])
+        self.assertIn('no es una cantidad', respuesta.context['avisos'][0]['texto'])
+
+    def test_varios_productos_de_una(self):
+        respuesta = self.client.post(self.url(), {
+            f'contado_{self.coca.pk}': '15',
+            f'contado_{self.vino.pk}': '12',
+            'confirmar': '1',
+        })
+
+        self.coca.refresh_from_db()
+        self.vino.refresh_from_db()
+        self.assertEqual(self.coca.stock_actual, 15)
+        self.assertEqual(self.vino.stock_actual, 12)
+        self.assertEqual(self.evento.gasto_stock, 5000 + 18 * 5000)
+
+    def test_un_evento_cerrado_no_acepta_conteo(self):
+        self.evento.estado = 'finalizado'
+        self.evento.save()
+
+        respuesta = self.client.post(
+            self.url(), {f'contado_{self.coca.pk}': '15', 'confirmar': '1'}, follow=True
+        )
+
+        self.coca.refresh_from_db()
+        self.assertEqual(self.coca.stock_actual, 20)
+        self.assertIn('finalizado', str(list(respuesta.context['messages'])[0]))
+
+    def test_un_producto_dado_de_baja_no_entra(self):
+        self.coca.dar_de_baja()
+        respuesta = self.client.post(self.url(), {f'contado_{self.coca.pk}': '15'})
+        self.assertEqual(respuesta.status_code, 302, 'no quedo nada que contar')
+
+    def test_el_empleado_puede_cerrar_por_conteo(self):
+        """Contar el sobrante al terminar la fiesta es lo que hace el mozo."""
+        self.client.force_login(User.objects.create_user('mozo', password='x-1234'))
+        self.assertEqual(self.client.get(self.url()).status_code, 200)
+
+
+class MenusDelEventoTests(TestCase):
+    """RN-31: que menus se sirven, y que hace falta para cada uno."""
+
+    def setUp(self):
+        self.usuario = User.objects.create_user('admin', password='x-1234', is_staff=True)
+        self.client.force_login(self.usuario)
+        self.carne = Producto.objects.create(
+            nombre='Carne', sector='cocina', precio_unitario=8000,
+            stock_actual=100, unidad_medida=una_unidad('Kilogramos'),
+        )
+        self.papa = Producto.objects.create(
+            nombre='Papa', sector='cocina', precio_unitario=1000,
+            stock_actual=100, unidad_medida=una_unidad('Kilogramos'),
+        )
+        self.adulto = Menu.objects.create(nombre='Adulto')
+        self.infantil = Menu.objects.create(nombre='Infantil')
+        self.evento = Evento.objects.create(
+            nombre='Boda', fecha=date(2026, 9, 1), asistentes=100
+        )
+
+    def test_las_tarjetas_mandan_sobre_los_asistentes(self):
+        una_receta({'menu': self.adulto}, self.carne, Decimal('0.250'))
+        una_receta({'menu': self.infantil}, self.carne, Decimal('0.150'))
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=80,
+            valor_unitario=1000, menu=self.adulto,
+        )
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Infantil', cantidad=20,
+            valor_unitario=500, menu=self.infantil,
+        )
+
+        porciones = {i['menu'].nombre: i['porciones'] for i in self.evento.menus_del_evento}
+        self.assertEqual(porciones, {'Adulto': 80, 'Infantil': 20})
+
+    def test_sin_tarjetas_vale_el_menu_del_evento_por_los_asistentes(self):
+        self.evento.menu = self.adulto
+        self.evento.save()
+
+        item = self.evento.menus_del_evento[0]
+        self.assertEqual(item['porciones'], 100)
+        self.assertFalse(item['por_tarjeta'])
+
+    def test_corregir_los_asistentes_recalcula_en_vivo(self):
+        """Sin tarjetas las porciones NO se sellan: se multiplican al mostrar."""
+        self.evento.menu = self.adulto
+        self.evento.save()
+        self.evento.asistentes = 150
+        self.evento.save()
+
+        self.assertEqual(self.evento.menus_del_evento[0]['porciones'], 150)
+
+    def test_un_producto_en_dos_platos_sale_en_una_linea(self):
+        """La papa va en el principal y en la guarnicion: se suma antes de redondear."""
+        una_receta({'menu': self.adulto}, self.papa, Decimal('0.200'), nombre='Bife')
+        una_receta({'menu': self.adulto}, self.papa, Decimal('0.100'),
+                   paso='secundario', nombre='Guarnicion')
+
+        ingredientes = self.adulto.necesita_para(80)
+        self.assertEqual(len(ingredientes), 1)
+        self.assertEqual(ingredientes[0]['cantidad'], Decimal('24.00'), '0,300 x 80')
+
+    def test_la_pantalla_muestra_lo_que_hace_falta(self):
+        una_receta({'menu': self.adulto}, self.carne, Decimal('0.250'))
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=80,
+            valor_unitario=1000, menu=self.adulto,
+        )
+
+        respuesta = self.client.get(reverse('stock:menu_del_evento', kwargs={
+            'evento_pk': self.evento.pk, 'menu_pk': self.adulto.pk,
+        }))
+
+        self.assertEqual(respuesta.context['porciones'], 80)
+        self.assertEqual(respuesta.context['ingredientes'][0]['cantidad'], Decimal('20.00'))
+
+    def test_un_menu_sin_receta_no_revienta(self):
+        self.evento.menu = self.adulto
+        self.evento.save()
+        respuesta = self.client.get(reverse('stock:menu_del_evento', kwargs={
+            'evento_pk': self.evento.pk, 'menu_pk': self.adulto.pk,
+        }))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(list(respuesta.context['ingredientes']), [])
+
+
 class ImprimirYModalTests(TestCase):
     """RN-28: el PDF lo hace el navegador, y el modal separa sus secciones."""
 

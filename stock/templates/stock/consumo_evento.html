@@ -10,6 +10,14 @@
       {% include 'stock/_chip_estado.html' with evento=evento %}
     </div>
   </div>
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    {# El cierre por conteo SÍ es del empleado: es carga de consumo (RN-30). #}
+    <a href="{% url 'stock:cierre_conteo' evento.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">inventory</span><span>Cerrar por conteo</span>
+    </a>
+  </div>
+
   {# Las dos salidas de esta pantalla van al detalle y al libro mayor: del administrador (RN-25). #}
   {% if user.is_staff %}
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">

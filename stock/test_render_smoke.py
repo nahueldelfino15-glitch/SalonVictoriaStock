@@ -161,6 +161,8 @@ class RenderSmoke(TestCase):
             ('puesto_create', reverse('stock:puesto_create')),
             ('puesto_update', reverse('stock:puesto_update', args=[self.puesto.pk])),
             ('puesto_delete', reverse('stock:puesto_delete', args=[self.puesto.pk])),
+            ('cierre_conteo', reverse('stock:cierre_conteo', args=[e])),
+            ('menu_del_evento', reverse('stock:menu_del_evento', args=[e, self.menu.pk])),
             ('unidad_list', reverse('stock:unidad_list')),
             ('unidad_create', reverse('stock:unidad_create')),
             ('unidad_update', reverse('stock:unidad_update', args=[self.unidad.pk])),

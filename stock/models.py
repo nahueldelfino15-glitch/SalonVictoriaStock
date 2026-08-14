@@ -133,6 +133,33 @@ class Menu(models.Model):
         """Los platos agrupados por momento de la comida, en orden de servicio."""
         return agrupar_por_paso(self.platos.all())
 
+    def necesita_para(self, porciones):
+        """Los productos que hacen falta para servir N cubiertos de este menú.
+
+        Un producto que está en dos platos (la papa va en el principal y en la
+        guarnición) sale en UNA línea, con las porciones sumadas **antes** de
+        redondear: dos redondeos por separado dan otro número (RN-19).
+        """
+        por_producto = {}
+        lineas = (
+            LineaReceta.objects
+            .filter(plato__menu=self)
+            .select_related('producto', 'producto__unidad_medida')
+        )
+        for linea in lineas:
+            item = por_producto.setdefault(
+                linea.producto_id,
+                {'producto': linea.producto, 'por_persona': Decimal('0')},
+            )
+            item['por_persona'] += linea.cantidad_por_persona
+
+        for item in por_producto.values():
+            item['cantidad'] = (item['por_persona'] * porciones).quantize(
+                Decimal('0.01'), rounding=ROUND_HALF_UP
+            )
+
+        return sorted(por_producto.values(), key=lambda i: i['producto'].nombre.lower())
+
 ESTADO_CHOICES = [
     ('pendiente', 'Pendiente'),
     ('confirmado', 'Confirmado'),
@@ -299,6 +326,34 @@ class Evento(models.Model):
     def platos_por_paso(self):
         """La receta de ESTE evento agrupada por momento de la comida."""
         return agrupar_por_paso(self.platos.all())
+
+    @property
+    def menus_del_evento(self):
+        """Qué menús se sirven y cuánta gente come de cada uno (RN-31).
+
+        Sale de `raciones_por_menu()`, así que respeta lo mismo que la receta: si
+        hay tarjetas con menú mandan ellas (80 del adulto + 20 del infantil), y
+        si no, el menú del evento por los asistentes.
+
+        `porciones` se resuelve acá y no en la consulta porque sin tarjetas vale
+        `None`, que significa "por los asistentes de HOY" (RN-23).
+        """
+        raciones = self.raciones_por_menu()
+        if not raciones:
+            return []
+
+        menus = {m.pk: m for m in Menu.objects.filter(pk__in=raciones)}
+        salida = []
+        for menu_id, porciones in raciones.items():
+            menu = menus.get(menu_id)
+            if menu is None:
+                continue            # el menú se borró del catálogo (SET_NULL)
+            salida.append({
+                'menu': menu,
+                'porciones': self.asistentes or 0 if porciones is None else porciones,
+                'por_tarjeta': porciones is not None,
+            })
+        return sorted(salida, key=lambda i: i['menu'].nombre.lower())
 
     @property
     def receta_calculada(self):

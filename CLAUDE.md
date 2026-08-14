@@ -810,6 +810,64 @@ Estado montándose sobre Paquete. Por eso la tira de datos usa `.grid-datos`
 ⚠️ Los comentarios `<!-- -->` viajan al navegador; los de Django `{# #}` no. Para
 notas de implementación va el segundo.
 
+⚠️ **Imprimir desde un modal abierto imprime el modal, no lo que quedó atrás.**
+`window.print()` imprime el documento, y el modal es un overlay sobre la pantalla
+anterior: sin esto, "Descargar PDF" en el detalle de un evento abierto sobre la
+lista imprimía **la lista**. El CSS lo resuelve con
+`body:has([data-modal]:not(.hidden))` — el modal se oculta con la clase `hidden`,
+así que `:not(.hidden)` es exactamente "está abierto". El membrete se repite
+dentro de `#modalRemoto` porque el de `<main>` queda escondido en ese caso.
+
+⚠️ **`location.href` con la misma ruta y otro `#hash` NO recarga.** El JS del
+modal navega al redirect de RN-27 (`/productos/#limpieza-pane`); si ya estabas en
+`/productos/`, el browser solo cambia el hash, `initTabs()` no vuelve a correr y
+la pestaña se queda en Barra — encima sin mostrar lo recién guardado. Por eso el
+helper `irA()` compara la ruta sin el hash y fuerza `reload()` cuando es la misma.
+
+### RN-30 · El consumo se carga contando lo que sobró
+`/eventos/<pk>/cierre-stock/` pide **cuánto quedó** de cada producto y calcula:
+
+```
+consumido = stock del sistema − lo contado
+```
+
+Es como se cuenta de verdad: nadie anota botella por botella mientras sirve, se
+cuenta el sobrante en el depósito al terminar. Antes había que hacer esa resta a
+mano por cada producto y cargar el resultado, que es justo donde aparecen los
+errores. La pantalla vieja (cargar el consumo directo) **sigue estando**: son dos
+caminos al mismo `MovimientoStock` de salida, no un reemplazo.
+
+**Va en dos pasos**: el primer POST muestra qué se va a descontar, el segundo lo
+escribe. Esto mueve el libro mayor de verdad — un cero de más en un input no puede
+descontar 200 botellas sin que nadie lo vea antes.
+
+⚠️ **Vacío no es cero.** Vacío = "no lo conté", y ese producto no se toca. Cero =
+"no quedó nada", y descuenta todo. Obligar a contar el depósito entero para cargar
+tres cosas sería peor que no tener la pantalla.
+
+⚠️ **Contar MÁS de lo que el sistema dice no es consumo negativo**: significa que
+faltaba cargar una compra, o que el stock venía mal. Se avisa y esa línea no se
+registra. Descontar un negativo inventaría mercadería que nunca entró.
+
+⚠️ Está en `PANTALLAS_DEL_EMPLEADO` (RN-25): contar el sobrante al terminar la
+fiesta es exactamente lo que hace el mozo. Es carga de consumo por otro camino,
+no una pantalla de administración.
+
+### RN-31 · El detalle del evento dice qué menús se sirven y qué hace falta
+`Evento.menus_del_evento` sale de `raciones_por_menu()`, así que respeta lo mismo
+que la receta: si hay tarjetas con menú **mandan ellas** (80 del adulto + 20 del
+infantil), y si no, el menú del evento por los asistentes (RN-23).
+
+El botón "Qué hace falta" abre `/eventos/<pk>/menu/<menu_pk>/`, que multiplica
+`Menu.necesita_para(porciones)` y marca en rojo lo que no alcanza en stock.
+
+⚠️ `porciones` se resuelve al mostrar, no se guarda: sin tarjetas vale `None`, que
+significa "por los asistentes de HOY". Corregir los asistentes de 100 a 150
+recalcula solo (misma razón que RN-23).
+
+⚠️ Un producto que está en dos platos del mismo menú sale en **una línea**, con las
+porciones sumadas antes de redondear (RN-19).
+
 ---
 
 ## 5. Flujos de usuario
