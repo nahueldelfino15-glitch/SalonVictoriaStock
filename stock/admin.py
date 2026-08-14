@@ -19,6 +19,7 @@ from .models import (
     Producto,
     Puesto,
     TarjetaEvento,
+    UnidadMedida,
 )
 
 
@@ -93,6 +94,12 @@ class DestinatarioAvisoAdmin(admin.ModelAdmin):
 
 @admin.register(Puesto)
 class PuestoAdmin(admin.ModelAdmin):
+    list_display = ('nombre',)
+    search_fields = ('nombre',)
+
+
+@admin.register(UnidadMedida)
+class UnidadMedidaAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
     search_fields = ('nombre',)
 

@@ -64,6 +64,11 @@ urlpatterns = [
     path('puestos/<int:pk>/editar/', views.PuestoUpdateView.as_view(), name='puesto_update'),
     path('puestos/<int:pk>/eliminar/', views.PuestoDeleteView.as_view(), name='puesto_delete'),
 
+    path('unidades/', views.UnidadMedidaListView.as_view(), name='unidad_list'),
+    path('unidades/nueva/', views.UnidadMedidaCreateView.as_view(), name='unidad_create'),
+    path('unidades/<int:pk>/editar/', views.UnidadMedidaUpdateView.as_view(), name='unidad_update'),
+    path('unidades/<int:pk>/eliminar/', views.UnidadMedidaDeleteView.as_view(), name='unidad_delete'),
+
     path('eventos/<int:evento_pk>/personal/nuevo/', views.PersonalEventoCreateView.as_view(), name='personalevento_create'),
     path('personal-evento/<int:pk>/editar/', views.PersonalEventoUpdateView.as_view(), name='personalevento_update'),
     path('personal-evento/<int:pk>/eliminar/', views.PersonalEventoDeleteView.as_view(), name='personalevento_delete'),

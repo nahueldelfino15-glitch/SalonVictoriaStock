@@ -13,5 +13,10 @@ guardar no mostraría nada.
 
 `extra_js` tampoco se incluye: los <script> insertados por innerHTML no se
 ejecutan, así que ofrecerlo sería prometer algo que no pasa.
+
+Lo único propio es el contenedor de abajo, y es necesario: en la pantalla suelta
+las secciones las separa el `flex flex-col gap-stack-lg` del <main> de base.html.
+Sin él acá, las pantallas de varias secciones (el detalle de un evento) salían
+todas pegadas una abajo de la otra dentro del modal, y solo ahí.
 {% endcomment %}
-{% block content %}{% endblock %}
+<div class="flex flex-col gap-stack-lg w-full">{% block content %}{% endblock %}</div>

@@ -73,7 +73,7 @@
               <th class="px-stack-lg py-3 font-semibold">Ingrediente</th>
               <th class="px-stack-md py-3 font-semibold">Por persona</th>
               <th class="px-stack-md py-3 font-semibold">Costo por persona</th>
-              <th class="px-stack-md py-3 font-semibold text-right">Acciones</th>
+              <th class="col-acciones px-stack-md py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-surface-overlay text-on-surface">
@@ -82,7 +82,7 @@
               <td class="px-stack-lg py-3 text-on-surface-high">{{ linea.producto.nombre }}</td>
               <td class="px-stack-md py-3 text-on-surface-med">{{ linea.cantidad_por_persona }} {{ linea.producto.unidad_medida }}</td>
               <td class="px-stack-md py-3 text-on-surface-med">$ {{ linea.costo_por_persona|floatformat:2 }}</td>
-              <td class="px-stack-md py-3 text-right whitespace-nowrap">
+              <td class="col-acciones px-stack-md py-3 text-right whitespace-nowrap">
                 <a data-modal-link href="{% url 'stock:lineareceta_update' linea.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
                 <a data-modal-link href="{% url 'stock:lineareceta_delete' linea.pk %}" aria-label="Sacar" title="Sacar del plato" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
               </td>

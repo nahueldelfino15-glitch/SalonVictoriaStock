@@ -1,0 +1,63 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Unidades de medida</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">En qué se mide cada producto. Las elegís al cargarlo.</p>
+  </div>
+
+  <a data-modal-link href="{% url 'stock:unidad_create' %}"
+     class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+    <span class="material-symbols-outlined text-[18px]">add</span><span>Nueva unidad</span>
+  </a>
+</header>
+
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Unidad</th>
+          <th class="px-stack-md py-4 font-semibold">En uso</th>
+          <th class="col-acciones px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for unidad in unidades %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">
+            <div class="flex items-center gap-stack-sm">
+              <span class="w-8 h-8 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-label-md text-label-md uppercase">{{ unidad.nombre|slice:":1"|upper }}</span>
+              <span class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ unidad.nombre }}</span>
+            </div>
+          </td>
+          <td class="px-stack-md py-4 text-on-surface-med">
+            {% with usos=unidad.productos.count %}
+            {% if usos %}{{ usos }} producto{{ usos|pluralize }}{% else %}—{% endif %}
+            {% endwith %}
+          </td>
+          <td class="col-acciones px-stack-md py-4 text-right whitespace-nowrap">
+            <a data-modal-link href="{% url 'stock:unidad_update' unidad.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:unidad_delete' unidad.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">straighten</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay unidades cargadas.</p>
+            <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Sin unidades no vas a poder decir si un producto se mide en kilos, litros o cajas.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ unidades|length }} unidad{{ unidades|length|pluralize:"es" }}</span>
+  </div>
+</div>
+
+{% endblock %}

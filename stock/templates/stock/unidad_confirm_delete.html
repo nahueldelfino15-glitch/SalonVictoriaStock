@@ -1,0 +1,40 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<div class="w-full max-w-lg mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg text-center">
+
+  <span class="material-symbols-outlined text-error text-[40px]">warning</span>
+
+  <h1 class="font-headline-lg text-headline-lg text-on-surface-high mt-stack-sm">¿Eliminar esta unidad?</h1>
+
+  <p class="font-body-md text-body-md text-on-surface-med mt-stack-sm">
+    <strong class="text-on-surface-high">{{ object.nombre }}</strong> deja de aparecer al cargar un producto.
+  </p>
+
+  {% with usos=object.productos.count %}
+  {% if usos %}
+  <div class="mt-stack-md rounded-lg border border-primary/40 bg-primary/5 px-stack-md py-stack-sm text-left">
+    <p class="font-body-sm text-body-sm text-on-surface flex items-start gap-stack-sm">
+      <span class="material-symbols-outlined text-primary text-[18px] shrink-0">info</span>
+      <span>La usan <strong>{{ usos }}</strong> producto{{ usos|pluralize }}, así que <strong>no se va a poder borrar</strong>: sin unidad, el stock de esos productos queda en un número suelto. Cambiásela primero.</span>
+    </p>
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <form method="post" class="flex flex-col-reverse sm:flex-row justify-center gap-stack-md mt-stack-lg pt-stack-md border-t border-surface-variant">
+    {% csrf_token %}
+    <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:unidad_list' %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      Cancelar
+    </a>
+    <button type="submit"
+            class="inline-flex items-center justify-center gap-unit bg-transparent border border-error/50 text-error hover:bg-error hover:text-on-error transition-colors font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">delete</span>
+      <span>Sí, eliminar</span>
+    </button>
+  </form>
+
+</div>
+
+{% endblock %}

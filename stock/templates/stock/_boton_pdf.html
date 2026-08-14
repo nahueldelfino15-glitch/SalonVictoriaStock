@@ -1,0 +1,15 @@
+{% comment %}
+Boton "Descargar PDF" (RN-28).
+
+No genera nada del lado del servidor: llama a window.print(), y el navegador
+ofrece "Guardar como PDF" como destino. El diseno del papel sale del bloque
+@media print de base.html.
+
+Es un <button onclick> y no un <script>: los <script> que entran por innerHTML no
+se ejecutan dentro de un modal (RN-22), asi que un listener no se ataria y el
+boton no haria nada justo en la pantalla donde mas se usa.
+{% endcomment %}
+<button type="button" onclick="window.print()"
+        class="no-print inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+  <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span><span>{{ etiqueta|default:"Descargar PDF" }}</span>
+</button>

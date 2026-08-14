@@ -20,7 +20,7 @@
         <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
           <th class="px-stack-md py-4 font-semibold">Puesto</th>
           <th class="px-stack-md py-4 font-semibold">En uso</th>
-          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          <th class="col-acciones px-stack-md py-4 font-semibold text-right">Acciones</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-overlay text-on-surface">
@@ -37,7 +37,7 @@
             {% if usos %}{{ usos }} asignación{{ usos|pluralize:"es" }}{% else %}—{% endif %}
             {% endwith %}
           </td>
-          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+          <td class="col-acciones px-stack-md py-4 text-right whitespace-nowrap">
             <a data-modal-link href="{% url 'stock:puesto_update' puesto.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
             <a data-modal-link href="{% url 'stock:puesto_delete' puesto.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
           </td>

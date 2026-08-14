@@ -29,7 +29,7 @@
           <th class="px-stack-md py-4 font-semibold">Evento</th>
           <th class="px-stack-md py-4 font-semibold">Asistentes</th>
           <th class="px-stack-md py-4 font-semibold">Estado</th>
-          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          <th class="col-acciones px-stack-md py-4 font-semibold text-right">Acciones</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-overlay text-on-surface">
@@ -41,7 +41,7 @@
           <td class="px-stack-md py-4">
             {% include 'stock/_chip_estado.html' with evento=evento %}
           </td>
-          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+          <td class="col-acciones px-stack-md py-4 text-right whitespace-nowrap">
             <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
             <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
             <a data-modal-link href="{% url 'stock:evento_delete' evento.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>

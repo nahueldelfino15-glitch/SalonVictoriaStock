@@ -10,7 +10,8 @@
     {% endif %}
   </div>
 
-  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+  <div class="no-print flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    {% include 'stock/_boton_pdf.html' %}
     <form method="get" class="relative w-full sm:w-[300px]">
       {% if ver_bajas %}<input type="hidden" name="bajas" value="1">{% endif %}
       <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-med pointer-events-none text-[20px]">search</span>

@@ -20,7 +20,7 @@ from django.urls import reverse
 
 from .models import (
     CargoEvento, Empleado, Evento, LineaReceta, Menu, MovimientoStock,
-    Paquete, PersonalEvento, Plato, Producto, Puesto, TarjetaEvento,
+    Paquete, PersonalEvento, Plato, Producto, Puesto, TarjetaEvento, UnidadMedida,
 )
 
 MARCA = '<<<INVALIDO:%s>>>'
@@ -55,6 +55,7 @@ class RenderSmoke(TestCase):
         self.client.force_login(self.usuario)
 
         self.puesto = Puesto.objects.get_or_create(nombre='Mozo')[0]
+        self.unidad = UnidadMedida.objects.get_or_create(nombre='Unidad')[0]
         self.empleado = Empleado.objects.create(nombre='Juan', puesto_habitual=self.puesto)
 
         self.p_barra = Producto.objects.create(nombre='Fernet', sector='barra',
@@ -75,8 +76,7 @@ class RenderSmoke(TestCase):
 
         self.evento = Evento.objects.create(nombre='Casamiento', fecha=date(2026, 9, 1),
                                             asistentes=100, estado='confirmado',
-                                            paquete=self.paquete, menu=self.menu,
-                                            precio_por_persona=Decimal('500'))
+                                            paquete=self.paquete, menu=self.menu)
         self.p_limpieza = Producto.objects.create(nombre='Lavandina', sector='limpieza',
                                                   precio_unitario=Decimal('50'), stock_actual=Decimal('20'))
         self.p_mobiliario = Producto.objects.create(nombre='Mantel', sector='mobiliario',
@@ -161,6 +161,10 @@ class RenderSmoke(TestCase):
             ('puesto_create', reverse('stock:puesto_create')),
             ('puesto_update', reverse('stock:puesto_update', args=[self.puesto.pk])),
             ('puesto_delete', reverse('stock:puesto_delete', args=[self.puesto.pk])),
+            ('unidad_list', reverse('stock:unidad_list')),
+            ('unidad_create', reverse('stock:unidad_create')),
+            ('unidad_update', reverse('stock:unidad_update', args=[self.unidad.pk])),
+            ('unidad_delete', reverse('stock:unidad_delete', args=[self.unidad.pk])),
             ('personalevento_create', reverse('stock:personalevento_create', args=[e])),
             ('personalevento_update', reverse('stock:personalevento_update', args=[self.pe.pk])),
             ('personalevento_delete', reverse('stock:personalevento_delete', args=[self.pe.pk])),
@@ -239,4 +243,39 @@ class RenderSmoke(TestCase):
                 fallas.append(f'{nombre} {url} vars invalidas: {invalidos}')
             if '<html' in html.lower():
                 fallas.append(f'{nombre} {url} devolvio la pagina ENTERA en modo modal')
+        self.assertEqual(fallas, [], '\n'.join(fallas))
+
+    def test_render_como_empleado(self):
+        """Las pantallas del empleado tienen ramas propias que nadie mas pinta.
+
+        El tester de arriba es administrador, asi que los {% templatetag openblock %} else {% templatetag closeblock %} del rol
+        (el calendario sin links, el consumo sin la pestania de personal) no se
+        renderizaban NUNCA: un typo ahi vivia hasta que lo encontrara un mozo.
+        """
+        self.client.force_login(self.otro_usuario)
+        pantallas = [
+            ('calendario', reverse('stock:calendario')),
+            ('consumo_selector', reverse('stock:consumo_selector')),
+            ('consumo_evento', reverse('stock:consumo_evento', args=[self.evento.pk])),
+            ('merma', reverse('stock:merma')),
+            ('movimientostock_create', reverse('stock:movimientostock_create', args=[self.evento.pk])),
+            # Corregir lo suyo: el form le llega con `tipo` deshabilitado.
+            ('movimientostock_update', reverse('stock:movimientostock_update', args=[self.mov_salida.pk])),
+            ('movimientostock_delete', reverse('stock:movimientostock_delete', args=[self.mov_salida.pk])),
+            ('movimientostock_update_merma', reverse('stock:movimientostock_update', args=[self.mov_merma.pk])),
+        ]
+        fallas = []
+        for nombre, url in pantallas:
+            try:
+                r = self.client.get(url)
+            except Exception as exc:
+                fallas.append(f'{nombre} {url} EXCEPCION {type(exc).__name__}: {exc}')
+                continue
+            if r.status_code != 200:
+                fallas.append(f'{nombre} {url} status {r.status_code} (el empleado deberia poder)')
+                continue
+            html = r.content.decode()
+            invalidos = sorted(set(re.findall(r'<<<INVALIDO:(.*?)>>>', html)))
+            if invalidos:
+                fallas.append(f'{nombre} {url} vars invalidas: {invalidos}')
         self.assertEqual(fallas, [], '\n'.join(fallas))

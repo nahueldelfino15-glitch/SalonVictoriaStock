@@ -35,7 +35,7 @@
           <th class="px-stack-md py-4 font-semibold">Rol</th>
           <th class="px-stack-md py-4 font-semibold">Estado</th>
           <th class="px-stack-md py-4 font-semibold">Último ingreso</th>
-          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          <th class="col-acciones px-stack-md py-4 font-semibold text-right">Acciones</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-overlay text-on-surface">
@@ -69,7 +69,7 @@
             {% endif %}
           </td>
           <td class="px-stack-md py-4 text-on-surface-med">{{ u.last_login|date:"d/m/Y H:i"|default:"Nunca entró" }}</td>
-          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+          <td class="col-acciones px-stack-md py-4 text-right whitespace-nowrap">
             <a data-modal-link href="{% url 'stock:usuario_update' u.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
             <a data-modal-link href="{% url 'stock:usuario_password' u.pk %}" aria-label="Cambiar contraseña" title="Cambiar contraseña" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">key</span></a>
             {% if u != request.user %}

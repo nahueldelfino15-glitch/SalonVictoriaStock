@@ -72,6 +72,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Misma idea que la línea de arriba, con el rol en vez de la sesión: una
+    # lista blanca acá cubre las 50 vistas y las que vengan (RN-25). Va último
+    # a propósito: usa `messages`, que lo prepara el middleware anterior.
+    'stock.middleware.RolEmpleadoMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'

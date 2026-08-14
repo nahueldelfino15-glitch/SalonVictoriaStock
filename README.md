@@ -70,7 +70,8 @@ Un recorrido que toca todo lo importante, en orden. Si algo de esto falla, es un
 - [ ] Probá mermar **más de lo que hay**: te tiene que frenar con un aviso.
 
 ### 3. Eventos y consumo
-- [ ] **Eventos** → "Nuevo evento" con fecha, asistentes y un **precio** (por persona o cerrado).
+- [ ] **Eventos** → "Nuevo evento" con fecha y asistentes. **No pide precio**: lo que
+      se cobra por cubierto se carga en las tarjetas (sección 6).
 - [ ] **Consumo** → elegí el evento → cargá consumo de algún producto.
 - [ ] Entrá al **detalle del evento**: tiene que mostrar Facturado / Costo / **Ganancia**.
 - [ ] Agregale un **cargo al cliente** (ej. "DJ", $50.000) y mirá cómo cambia la ganancia.
@@ -107,13 +108,24 @@ Acá está el cálculo de plata. Es lo más importante de esta tanda.
       y volvé al evento. **El facturado no se tiene que mover.** Probá también
       borrando el paquete: tampoco.
 
-### 7. Puestos
+### 7. Unidades de medida y PDF
+- [ ] **Unidades** (menú lateral) → vienen Cajas, Kilogramos, Litros y Unidad;
+      agregá una nueva (ej. "Botellas").
+- [ ] Cargá un producto: **Unidad de medida es un desplegable**, ya no texto libre.
+- [ ] Intentá **borrar una unidad que esté en uso**: te tiene que frenar.
+- [ ] En **Productos**, editá o borrá algo de la pestaña *Extras*: al guardar tenés
+      que **volver a Extras**, no a Barra.
+- [ ] Botón **Descargar PDF** en el detalle de un evento, en Productos y en Eventos.
+      Abre el diálogo de impresión: elegí **"Guardar como PDF"** como destino.
+      En el papel no salen ni el menú ni los botones, y va en negro sobre blanco.
+
+### 8. Puestos
 - [ ] **Puestos** → la lista la administrás vos. Vienen cargados Mozo, Barman, Cocina,
       Dj, Limpieza, Seguridad y Otro; agregá uno nuevo (ej. "Valet").
 - [ ] Intentá **borrar un puesto que esté usado** en algún evento: te tiene que frenar.
       Es historial de pagos, no se puede dejar sin etiqueta lo ya liquidado.
 
-### 8. Recetas
+### 9. Recetas
 La receta se carga **solo en el menú**, organizada en platos. El evento la hereda.
 
 - [ ] **Menús** → entrá a un menú → en cada paso (Entrante / Plato principal / Plato
@@ -132,7 +144,7 @@ La receta se carga **solo en el menú**, organizada en platos. El evento la here
 - [ ] Si un producto está en **dos platos**, tiene que aparecer **una sola vez** en
       consumo, con las cantidades sumadas.
 
-### 9. Modales y menú lateral
+### 10. Modales y menú lateral
 - [ ] El menú de la izquierda **colapsa** con el botón ☰ de arriba. Cerrá el navegador,
       volvé a entrar: tiene que **acordarse** de cómo lo dejaste.
 - [ ] Cualquier **ver / editar / eliminar** de una tabla abre un **modal**, sin cambiar
@@ -142,13 +154,13 @@ La receta se carga **solo en el menú**, organizada en platos. El evento la here
 - [ ] Abrí uno de esos links con **Ctrl+click**: tiene que abrir la pantalla completa
       en otra pestaña. El modal es una comodidad, no un requisito.
 
-### 10. Cierre de evento
+### 11. Cierre de evento
 - [ ] Editá el evento y ponelo en **Finalizado**.
 - [ ] Intentá cargarle consumo: no te tiene que dejar.
 - [ ] En el detalle del evento aparece **"Reabrir evento"**. Usalo y probá que ahora sí deja.
 - [ ] Fijate que queda la marca de "Reabierto el ...".
 
-### 11. Recordatorios por mail
+### 12. Recordatorios por mail
 - [ ] **Avisos** (menú lateral) → agregá uno o más destinatarios. Podés silenciar a
       alguien sin borrarlo (destildá "activo").
 - [ ] Probá sin mandar nada:
@@ -189,7 +201,7 @@ Ojo: solo manda si la PC está prendida a esa hora. Si un día estuvo apagada, e
 **no se pierde** — el comando trabaja con una ventana de días, así que sale en la
 próxima corrida.
 
-### 12. Que el pasado no se mueva
+### 13. Que el pasado no se mueva
 Esto es lo más importante del sistema, y lo más fácil de romper:
 
 - [ ] Anotá el **costo** de un evento que ya tenga consumo cargado.
@@ -214,8 +226,8 @@ Para que no lo reportes como bug:
 - **El pago del personal se carga a mano.** Las horas trabajadas son informativas, no calculan nada.
 - **El mismo empleado se puede cargar dos veces en el mismo evento** y se duplica el pago.
 - **La fecha de un movimiento no se puede editar** (queda la de cuando lo cargaste).
-- Los 3 eventos de prueba **no tienen precio cargado**, así que muestran "sin precio"
-  en vez de ganancia. Cargáselo para ver los números.
+- De los 3 eventos de prueba, solo el de 15 años factura algo (su paquete, $129.013).
+  Los otros dos muestran "sin precio" hasta que les cargues las tarjetas.
 
 ## Un tema pendiente de la base de prueba
 
@@ -237,12 +249,12 @@ No está corrido a propósito. En una base real conviene contar el depósito ant
 python manage.py test stock
 ```
 
-Son **181** y tienen que pasar todos. Cubren la aritmética del stock, la validación
+Son **212** y tienen que pasar todos. Cubren la aritmética del stock, la validación
 de faltantes, la merma, el congelamiento de costos, el margen, las recetas por plato,
 el catálogo de puestos, las tarjetas, los recordatorios por mail y que los
 modales no se coman los mensajes.
 
 ## Dónde está la documentación técnica
 
-En [CLAUDE.md](CLAUDE.md): modelo de datos, las 25 reglas de negocio, las trampas
+En [CLAUDE.md](CLAUDE.md): modelo de datos, las 29 reglas de negocio, las trampas
 conocidas y la deuda técnica pendiente.

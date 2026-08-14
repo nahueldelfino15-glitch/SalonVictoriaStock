@@ -10,6 +10,8 @@
       {% include 'stock/_chip_estado.html' with evento=evento %}
     </div>
   </div>
+  {# Las dos salidas de esta pantalla van al detalle y al libro mayor: del administrador (RN-25). #}
+  {% if user.is_staff %}
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
     <a href="{% url 'stock:movimiento_list' %}?evento={{ evento.pk }}"
        class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
@@ -20,21 +22,75 @@
       <span class="material-symbols-outlined text-[18px]">visibility</span><span>Ver detalle del evento</span>
     </a>
   </div>
+  {% endif %}
 </header>
 
 <!-- Botonera de pestañas -->
+{# La pestaña "Personal" carga PAGOS: el empleado ni la ve (RN-25). #}
+{% if user.is_staff %}
 {% include 'stock/_tabs_sectores.html' with tab_extra_id='personal' tab_extra_label='Personal' %}
+{% else %}
+{% include 'stock/_tabs_sectores.html' %}
+{% endif %}
 
 {% if evento.menu %}
 <div class="flex items-start gap-stack-sm border border-primary/40 bg-primary/5 rounded-xl px-stack-md py-stack-sm">
   <span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-[2px]">restaurant_menu</span>
   <p class="font-body-sm text-body-sm text-on-surface">
     Las cantidades vienen precargadas con la receta de
-    <a href="{% url 'stock:menu_detail' evento.menu.pk %}" class="text-primary hover:underline">{{ evento.menu.nombre }}</a>
+    {% if user.is_staff %}<a href="{% url 'stock:menu_detail' evento.menu.pk %}" class="text-primary hover:underline">{{ evento.menu.nombre }}</a>{% else %}<strong class="text-on-surface-high">{{ evento.menu.nombre }}</strong>{% endif %}
     para {{ evento.asistentes|default:0 }} persona{{ evento.asistentes|default:0|pluralize }}.
     <strong class="text-on-surface-high">Corregí con lo que realmente salió</strong> y confirmá: nada se descuenta solo.
   </p>
 </div>
+{% endif %}
+
+<!-- ==================== Lo ya cargado en este evento ==================== -->
+{% comment %}
+Sin esta tabla, "el empleado puede corregir" era letra muerta: el historial y el
+detalle del evento son del administrador, así que no tenía desde dónde llegar al
+botón de editar (RN-25). Muestra cantidades, nunca costos.
+{% endcomment %}
+{% if cargado %}
+<section class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="px-stack-lg py-stack-md border-b border-surface-overlay bg-surface-container flex justify-between items-center gap-stack-md">
+    <h2 class="font-label-md text-label-md text-primary uppercase tracking-wider">Ya cargado en este evento</h2>
+    <span class="font-body-sm text-body-sm text-on-surface-med">Corregí acá si te equivocaste</span>
+  </div>
+
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-3 font-semibold">Producto</th>
+          <th class="px-stack-md py-3 font-semibold text-right">Cantidad</th>
+          <th class="px-stack-md py-3 font-semibold">Cargado</th>
+          <th class="col-acciones px-stack-md py-3 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for m in cargado %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-3">
+            <span class="text-on-surface-high group-hover:text-primary transition-colors">{{ m.producto.nombre }}</span>
+            <span class="block font-label-md text-[10px] uppercase tracking-wider text-on-surface-med">{{ m.producto.get_sector_display }}</span>
+          </td>
+          <td class="px-stack-md py-3 text-right">−{{ m.cantidad }} {{ m.producto.unidad_medida }}</td>
+          <td class="px-stack-md py-3 text-on-surface-med">{{ m.fecha|date:"d/m/Y H:i" }}</td>
+          <td class="col-acciones px-stack-md py-3 text-right whitespace-nowrap">
+            <a data-modal-link href="{% url 'stock:movimientostock_update' m.pk %}" aria-label="Corregir" title="Corregir" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:movimientostock_delete' m.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-3 border-t border-surface-overlay bg-surface-container text-on-surface-med font-body-sm text-body-sm">
+    {{ cargado|length }} movimiento{{ cargado|length|pluralize }} · borrar uno devuelve el stock
+  </div>
+</section>
 {% endif %}
 
 <!-- Paneles -->
@@ -44,6 +100,7 @@
 </div>
 {% endfor %}
 
+{% if user.is_staff %}
 <div id="personal-pane" data-tab-panel role="tabpanel" aria-labelledby="personal-tab" class="hidden">
   <div class="bg-surface-raised rounded-xl border border-surface-overlay p-stack-lg">
     <div class="mb-stack-lg">
@@ -112,5 +169,6 @@
     {% endif %}
   </div>
 </div>
+{% endif %}{# /personal-pane: solo administrador #}
 
 {% endblock %}

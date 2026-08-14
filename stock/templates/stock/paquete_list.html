@@ -21,7 +21,7 @@
           <th class="px-stack-md py-4 font-semibold">Nombre</th>
           <th class="px-stack-md py-4 font-semibold">Descripción</th>
           <th class="px-stack-md py-4 font-semibold">Precio</th>
-          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          <th class="col-acciones px-stack-md py-4 font-semibold text-right">Acciones</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-overlay text-on-surface">
@@ -36,7 +36,7 @@
           </td>
           <td class="px-stack-md py-4 text-on-surface-med">{{ paquete.descripcion|truncatechars:60|default:"—" }}</td>
           <td class="px-stack-md py-4 text-on-surface-med">{% if paquete.precio %}$ {{ paquete.precio|floatformat:2 }}{% else %}—{% endif %}</td>
-          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+          <td class="col-acciones px-stack-md py-4 text-right whitespace-nowrap">
             <a data-modal-link href="{% url 'stock:paquete_detail' paquete.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
             <a data-modal-link href="{% url 'stock:paquete_update' paquete.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
             <a data-modal-link href="{% url 'stock:paquete_delete' paquete.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>

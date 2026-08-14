@@ -27,6 +27,25 @@ def sector_valoriza(sector):
     return sector not in SECTORES_SIN_PRECIO
 
 
+class UnidadMedida(models.Model):
+    """En qué se mide un producto: kilogramos, litros, unidad, cajas (RN-26).
+
+    Es una tabla y no `choices` por el mismo motivo que `Puesto` (RN-21): el salón
+    compra en formatos que van cambiando (botellas, docenas, bidones), y agregar
+    uno no puede depender de un deploy.
+    """
+
+    nombre = models.CharField(max_length=30, unique=True)
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'unidad de medida'
+        verbose_name_plural = 'unidades de medida'
+
+    def __str__(self):
+        return self.nombre
+
+
 class Producto(models.Model):
     nombre = models.CharField(max_length=100)
     sector = models.CharField(max_length=20, choices=SECTOR_CHOICES)
@@ -38,7 +57,17 @@ class Producto(models.Model):
         default=0,
         validators=[MinValueValidator(0)],
     )
-    unidad_medida = models.CharField(max_length=20, default='unidad')
+    # PROTECT (RN-26): la unidad es lo que le da sentido al stock. Borrar "Litros"
+    # del catálogo dejaría el fernet en "50" a secas, que no es un dato, es un número.
+    # null=True es para la base (los productos viejos migran solos); el form igual
+    # la exige, así que ninguno nuevo nace sin unidad.
+    unidad_medida = models.ForeignKey(
+        UnidadMedida,
+        on_delete=models.PROTECT,
+        null=True,
+        related_name='productos',
+        verbose_name='Unidad de medida',
+    )
     activo = models.BooleanField(
         default=True,
         help_text='Los productos dados de baja no aparecen en Compras, Consumo ni Merma, '
@@ -120,24 +149,6 @@ class Evento(models.Model):
     menu = models.ForeignKey(Menu, on_delete=models.SET_NULL, null=True, blank=True, related_name='eventos')
     telefono_contacto = models.CharField(max_length=30, blank=True, verbose_name='Teléfono de contacto')
     notas = models.TextField(blank=True)
-    precio_por_persona = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(0)],
-        verbose_name='Precio por persona',
-        help_text='Lo que se cobra por cubierto. Se multiplica por los asistentes.',
-    )
-    precio_cerrado = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(0)],
-        verbose_name='Precio cerrado',
-        help_text='Monto total acordado. Si lo cargás, manda sobre el precio por persona.',
-    )
     precio_paquete = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -434,31 +445,22 @@ class Evento(models.Model):
         return self.precio_paquete or 0
 
     @property
-    def ingreso_base(self):
-        """Los montos sueltos del evento: el cerrado y el por-cubierto.
-
-        Los dos SUMAN, ninguno pisa al otro — es lo que pidió el dueño. Ojo: si se
-        cargan tarjetas Y precio por persona, la misma plata entra dos veces. Por eso
-        `desglose_ingresos` existe: con el detalle a la vista se nota, con un total
-        pelado no.
-        """
-        total = 0
-        if self.precio_cerrado is not None:
-            total += self.precio_cerrado
-        if self.precio_por_persona is not None:
-            total += self.precio_por_persona * (self.asistentes or 0)
-        return total
-
-    @property
     def ingreso_cargos(self):
         """Los adicionales facturados aparte: barra libre, DJ, horas extra."""
         return sum(c.monto for c in self.cargos.all())
 
     @property
     def ingreso_total(self):
+        """Lo facturado sale de las tarjetas, el brindis, el paquete y los cargos.
+
+        El evento ya no tiene precio propio: antes había `precio_cerrado` y
+        `precio_por_persona`, y sumaban EN PARALELO a las tarjetas. Cargar las dos
+        cosas facturaba la misma comida dos veces, sin que nada lo avisara. El
+        cubierto se cobra en un solo lugar — la tabla de tarjetas — que además es el
+        único que sabe distinguir 80 adultos de 20 menús infantiles (RN-23).
+        """
         return (
-            self.ingreso_base
-            + self.ingreso_tarjetas
+            self.ingreso_tarjetas
             + self.ingreso_brindis
             + self.ingreso_paquete
             + self.ingreso_cargos
@@ -494,20 +496,6 @@ class Evento(models.Model):
                 'concepto': f'Paquete {self.paquete.nombre}' if self.paquete_id else 'Paquete',
                 'detalle': 'monto total',
                 'monto': self.ingreso_paquete,
-            })
-
-        if self.precio_cerrado:
-            renglones.append({
-                'concepto': 'Precio cerrado',
-                'detalle': '',
-                'monto': self.precio_cerrado,
-            })
-
-        if self.precio_por_persona:
-            renglones.append({
-                'concepto': 'Precio por persona',
-                'detalle': f'{self.asistentes or 0} × $ {self.precio_por_persona:,.2f}',
-                'monto': self.precio_por_persona * (self.asistentes or 0),
             })
 
         for cargo in self.cargos.all():

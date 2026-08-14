@@ -31,12 +31,18 @@ from .models import (
     Producto,
     Puesto,
     TarjetaEvento,
+    UnidadMedida,
 )
 
 
 def un_puesto(nombre='Mozo'):
     """El puesto ya no es texto libre: es una fila del catalogo (Puesto)."""
     return Puesto.objects.get_or_create(nombre=nombre)[0]
+
+
+def una_unidad(nombre='Unidad'):
+    """Misma historia que un_puesto(): la unidad es catalogo, no texto (RN-26)."""
+    return UnidadMedida.objects.get_or_create(nombre=nombre)[0]
 
 
 def una_receta(dueno, producto, cantidad, paso='principal', nombre='Plato'):
@@ -47,11 +53,16 @@ def una_receta(dueno, producto, cantidad, paso='principal', nombre='Plato'):
 
 
 class ClienteLogueadoTests(TestCase):
-    """Base para los tests que navegan: el sistema entero pide sesión."""
+    """Base para los tests que navegan: el sistema entero pide sesión.
+
+    El tester es ADMINISTRADOR (`is_staff`) porque estos tests recorren todo el
+    sistema, que es justo lo que el empleado no puede hacer (RN-25). Lo que ve y
+    lo que no ve un empleado se prueba aparte, en RolEmpleadoTests.
+    """
 
     def setUp(self):
         super().setUp()
-        self.client.force_login(User.objects.create_user('tester', password='tester-1234'))
+        self.client.force_login(User.objects.create_user('tester', password='tester-1234', is_staff=True))
 
 
 class StockAritmeticaTests(TestCase):
@@ -253,7 +264,7 @@ class DecimalesTests(TestCase):
     def setUp(self):
         self.producto = Producto.objects.create(
             nombre='Lomo', sector='cocina', precio_unitario=20000,
-            stock_actual=Decimal('10.50'), unidad_medida='kg',
+            stock_actual=Decimal('10.50'), unidad_medida=una_unidad('Kilogramos'),
         )
         self.evento = Evento.objects.create(nombre='Corporativo', fecha=date(2026, 7, 1))
 
@@ -352,29 +363,43 @@ class RentabilidadTests(TestCase):
         self.assertEqual(self.evento.ingreso_total, 0)
         self.assertIsNone(self.evento.margen_porcentaje)
 
-    def test_precio_por_persona_se_multiplica_por_los_asistentes(self):
-        self.evento.precio_por_persona = 5000
-        self.assertEqual(self.evento.ingreso_base, 500000)
+    def test_el_evento_no_tiene_precio_propio(self):
+        """El cubierto se cobra en un solo lugar: la tabla de tarjetas.
 
-    def test_el_precio_cerrado_y_el_por_persona_se_suman(self):
-        """Decision del dueno: todo suma, nada pisa a nada.
-
-        Antes el cerrado mandaba sobre el por-persona. Se cambio a pedido: el
-        riesgo de facturar dos veces se cubre mostrando el desglose abierto.
+        `precio_cerrado` y `precio_por_persona` se fueron del modelo. Sumaban EN
+        PARALELO a las tarjetas, asi que cargar las dos cosas facturaba la misma
+        comida dos veces sin que nada avisara.
         """
-        self.evento.precio_por_persona = 5000     # x 100 asistentes
-        self.evento.precio_cerrado = 400000
-        self.assertEqual(self.evento.ingreso_base, 900000)
+        self.assertFalse(hasattr(self.evento, 'precio_cerrado'))
+        self.assertFalse(hasattr(self.evento, 'precio_por_persona'))
 
-    def test_un_evento_sin_asistentes_con_precio_por_persona_da_cero(self):
-        """'Casamiento Nascar' existe y tiene 0 asistentes: para eso está el cerrado."""
+    def test_lo_que_factura_el_evento_sale_de_las_tarjetas(self):
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=80, valor_unitario=50000
+        )
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Infantil', cantidad=20, valor_unitario=30000
+        )
+        self.assertEqual(self.evento.ingreso_total, 4_600_000)
+
+    def test_un_evento_sin_asistentes_igual_factura_por_sus_tarjetas(self):
+        """'Casamiento Nascar' existe y tiene 0 asistentes cargados.
+
+        Antes el ingreso por cubierto se multiplicaba por `asistentes`, asi que ese
+        evento facturaba 0 hasta que alguien corrigiera el numero. La tarjeta trae
+        su propia cantidad: no depende del campo del evento.
+        """
         self.evento.asistentes = 0
-        self.evento.precio_por_persona = 5000
-        self.assertEqual(self.evento.ingreso_base, 0)
+        self.evento.save()
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=5000
+        )
+        self.assertEqual(self.evento.ingreso_total, 500000)
 
     def test_los_cargos_suman_al_ingreso(self):
-        self.evento.precio_cerrado = 400000
-        self.evento.save()
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=4000
+        )
         CargoEvento.objects.create(evento=self.evento, concepto='Barra libre', monto=80000)
         CargoEvento.objects.create(evento=self.evento, concepto='DJ', monto=50000)
 
@@ -382,8 +407,9 @@ class RentabilidadTests(TestCase):
         self.assertEqual(self.evento.ingreso_total, 530000)
 
     def test_el_margen_es_lo_facturado_menos_lo_gastado(self):
-        self.evento.precio_cerrado = 500000
-        self.evento.save()
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=5000
+        )
         CargoEvento.objects.create(evento=self.evento, concepto='DJ', monto=50000)
         MovimientoStock.objects.create(
             producto=self.producto, evento=self.evento, tipo='salida', cantidad=100
@@ -397,16 +423,18 @@ class RentabilidadTests(TestCase):
         self.assertEqual(self.evento.margen, 300000)
 
     def test_un_evento_que_pierde_plata_da_margen_negativo(self):
-        self.evento.precio_cerrado = 100000
-        self.evento.save()
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=1000
+        )
         PersonalEvento.objects.create(
             evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=150000
         )
         self.assertEqual(self.evento.margen, -50000)
 
     def test_el_porcentaje_de_margen(self):
-        self.evento.precio_cerrado = 200000
-        self.evento.save()
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=2000
+        )
         PersonalEvento.objects.create(
             evento=self.evento, empleado=self.empleado, puesto=un_puesto('Mozo'), pago=50000
         )
@@ -414,8 +442,9 @@ class RentabilidadTests(TestCase):
 
     def test_la_merma_no_le_come_el_margen_al_evento(self):
         """El choque que abrió toda la auditoría, ahora medido."""
-        self.evento.precio_cerrado = 500000
-        self.evento.save()
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=5000
+        )
         MovimientoStock.objects.create(
             producto=self.producto, evento=self.evento, tipo='salida', cantidad=100
         )
@@ -620,9 +649,8 @@ class TarjetasTests(ClienteLogueadoTests):
         self.assertEqual(self.evento.margen, 4_859_013)
 
     def test_el_desglose_muestra_de_donde_sale_cada_peso(self):
-        """Es el seguro contra la doble suma: todo suma, asi que hay que verlo."""
+        """Cada peso facturado tiene que poder rastrearse hasta su renglon."""
         self.evento.paquete = self.paquete
-        self.evento.precio_por_persona = 1000
         self.evento.save()
         TarjetaEvento.objects.create(
             evento=self.evento, concepto='Adultos', cantidad=80, valor_unitario=50000
@@ -632,7 +660,6 @@ class TarjetasTests(ClienteLogueadoTests):
         conceptos = [r['concepto'] for r in self.evento.desglose_ingresos]
         self.assertIn('Adultos', conceptos)
         self.assertIn('Paquete Premium', conceptos)
-        self.assertIn('Precio por persona', conceptos)
         self.assertIn('DJ', conceptos)
 
         total = sum(r['monto'] for r in self.evento.desglose_ingresos)
@@ -710,11 +737,11 @@ class RecetaTests(TestCase):
     def setUp(self):
         self.carne = Producto.objects.create(
             nombre='Carne', sector='cocina', precio_unitario=8000,
-            stock_actual=500, unidad_medida='kg'
+            stock_actual=500, unidad_medida=una_unidad('Kilogramos')
         )
         self.vino = Producto.objects.create(
             nombre='Vino', sector='barra', precio_unitario=3000,
-            stock_actual=500, unidad_medida='botella'
+            stock_actual=500, unidad_medida=una_unidad('Botellas')
         )
         self.menu = Menu.objects.create(nombre='Clásico')
         self.principal = una_receta(
@@ -836,15 +863,15 @@ class RecetaPorTarjetaTests(TestCase):
     def setUp(self):
         self.carne = Producto.objects.create(
             nombre='Carne', sector='cocina', precio_unitario=8000,
-            stock_actual=1000, unidad_medida='kg',
+            stock_actual=1000, unidad_medida=una_unidad('Kilogramos'),
         )
         self.nuggets = Producto.objects.create(
             nombre='Nuggets', sector='cocina', precio_unitario=4000,
-            stock_actual=1000, unidad_medida='kg',
+            stock_actual=1000, unidad_medida=una_unidad('Kilogramos'),
         )
         self.papa = Producto.objects.create(
             nombre='Papa', sector='cocina', precio_unitario=1000,
-            stock_actual=1000, unidad_medida='kg',
+            stock_actual=1000, unidad_medida=una_unidad('Kilogramos'),
         )
 
         # Menu de adultos: 250 g de carne + 200 g de papa por cubierto.
@@ -1056,7 +1083,10 @@ class BajaDeProductoTests(ClienteLogueadoTests):
             nombre='Whisky', sector='barra', precio_unitario=10000, stock_actual=50
         )
         self.evento = Evento.objects.create(
-            nombre='Casamiento', fecha=date(2025, 6, 1), precio_cerrado=900000
+            nombre='Casamiento', fecha=date(2025, 6, 1), asistentes=100
+        )
+        TarjetaEvento.objects.create(
+            evento=self.evento, concepto='Adultos', cantidad=100, valor_unitario=9000
         )
 
     def test_borrar_un_producto_con_historial_lo_da_de_baja_y_no_toca_el_pasado(self):
@@ -1209,7 +1239,7 @@ class SectoresNuevosTests(ClienteLogueadoTests):
             nombre='Lavandina', sector='limpieza', precio_unitario=500, stock_actual=10
         )
         self.mantel = Producto.objects.create(
-            nombre='Mantel', sector='mobiliario', stock_actual=40, unidad_medida='unidad'
+            nombre='Mantel', sector='mobiliario', stock_actual=40, unidad_medida=una_unidad()
         )
 
     def test_los_sectores_nuevos_aparecen_en_las_cuatro_pantallas(self):
@@ -1245,7 +1275,7 @@ class SectoresNuevosTests(ClienteLogueadoTests):
 
     def test_el_mobiliario_consumido_no_le_infla_el_costo_al_evento(self):
         """Los manteles son del salón: usarlos no es un gasto de la fiesta."""
-        evento = Evento.objects.create(nombre='Boda', fecha=date(2026, 6, 1), precio_cerrado=100000)
+        evento = Evento.objects.create(nombre='Boda', fecha=date(2026, 6, 1))
         MovimientoStock.objects.create(
             producto=self.mantel, evento=evento, tipo='salida', cantidad=30
         )
@@ -1261,7 +1291,7 @@ class SectoresNuevosTests(ClienteLogueadoTests):
     def test_el_alta_por_pantalla_acepta_un_sector_nuevo(self):
         self.client.post(reverse('stock:producto_create'), {
             'nombre': 'Copas', 'sector': 'mobiliario', 'precio_unitario': '',
-            'stock_actual': '50', 'unidad_medida': 'unidad',
+            'stock_actual': '50', 'unidad_medida': una_unidad().pk,
         })
         copas = Producto.objects.get(nombre='Copas')
         self.assertEqual(copas.sector, 'mobiliario')
@@ -1358,7 +1388,7 @@ class ModalTests(ClienteLogueadoTests):
         respuesta = self.client.post(
             reverse('stock:producto_update', kwargs={'pk': self.producto.pk}),
             {'nombre': 'Fernet 1L', 'sector': 'barra', 'precio_unitario': '5000',
-             'unidad_medida': 'unidad'},
+             'unidad_medida': una_unidad().pk},
             **self.CABECERA,
         )
         self.assertEqual(respuesta.status_code, 302)
@@ -1368,7 +1398,7 @@ class ModalTests(ClienteLogueadoTests):
     def test_un_form_con_errores_vuelve_como_fragmento_y_no_redirige(self):
         respuesta = self.client.post(
             reverse('stock:producto_update', kwargs={'pk': self.producto.pk}),
-            {'nombre': '', 'sector': 'barra', 'precio_unitario': '5000', 'unidad_medida': 'unidad'},
+            {'nombre': '', 'sector': 'barra', 'precio_unitario': '5000', 'unidad_medida': una_unidad().pk},
             **self.CABECERA,
         )
         self.assertEqual(respuesta.status_code, 200)
@@ -1484,7 +1514,7 @@ class RecordatoriosPorMailTests(TestCase):
     def test_el_mail_incluye_las_tarjetas_y_la_comida_estimada(self):
         producto = Producto.objects.create(
             nombre='Carne', sector='cocina', precio_unitario=8000,
-            stock_actual=500, unidad_medida='kg',
+            stock_actual=500, unidad_medida=una_unidad('Kilogramos'),
         )
         menu = Menu.objects.create(nombre='Clásico')
         plato = Plato.objects.create(menu=menu, paso='principal', nombre='Bife')
@@ -1497,7 +1527,7 @@ class RecordatoriosPorMailTests(TestCase):
         self.correr()
         cuerpo = mail.outbox[0].body
         self.assertIn('80 × Adultos', cuerpo)
-        self.assertIn('20.00 kg de Carne', cuerpo, '0,250 × 80 tarjetas')
+        self.assertIn('20.00 Kilogramos de Carne', cuerpo, '0,250 × 80 tarjetas')
 
 
 class ReconciliacionTests(TestCase):
@@ -1567,11 +1597,11 @@ class AutenticacionTests(TestCase):
         self.assertEqual(self.client.get(reverse('stock:login')).status_code, 200)
 
     def test_con_sesion_se_entra(self):
-        self.client.force_login(User.objects.create_user('tester', password='tester-1234'))
+        self.client.force_login(User.objects.create_user('tester', password='tester-1234', is_staff=True))
         self.assertEqual(self.client.get(reverse('stock:home')).status_code, 200)
 
     def test_se_puede_cerrar_sesion(self):
-        self.client.force_login(User.objects.create_user('tester', password='tester-1234'))
+        self.client.force_login(User.objects.create_user('tester', password='tester-1234', is_staff=True))
         self.client.post(reverse('stock:logout'))
         self.assertEqual(self.client.get(reverse('stock:home')).status_code, 302)
 
@@ -1746,7 +1776,7 @@ class StockNoSeEditaAManoTests(ClienteLogueadoTests):
     def test_el_alta_con_stock_inicial_genera_la_entrada_que_lo_respalda(self):
         self.client.post(reverse('stock:producto_create'), {
             'nombre': 'Sidra', 'sector': 'barra', 'precio_unitario': '1200',
-            'stock_actual': '12', 'unidad_medida': 'unidad',
+            'stock_actual': '12', 'unidad_medida': una_unidad().pk,
         })
         producto = Producto.objects.get(nombre='Sidra')
         self.assertEqual(producto.stock_actual, 12)
@@ -1762,7 +1792,7 @@ class StockNoSeEditaAManoTests(ClienteLogueadoTests):
         )
         self.client.post(reverse('stock:producto_update', kwargs={'pk': producto.pk}), {
             'nombre': 'Agua', 'sector': 'barra', 'precio_unitario': '300',
-            'stock_actual': '999', 'unidad_medida': 'unidad',
+            'stock_actual': '999', 'unidad_medida': una_unidad().pk,
         })
         producto.refresh_from_db()
         self.assertEqual(producto.stock_actual, 7, 'el stock no se toca desde el form')
@@ -1771,7 +1801,7 @@ class StockNoSeEditaAManoTests(ClienteLogueadoTests):
         """Lo que separa un inventario confiable de una planilla suelta."""
         self.client.post(reverse('stock:producto_create'), {
             'nombre': 'Tonica', 'sector': 'barra', 'precio_unitario': '900',
-            'stock_actual': '20', 'unidad_medida': 'unidad',
+            'stock_actual': '20', 'unidad_medida': una_unidad().pk,
         })
         producto = Producto.objects.get(nombre='Tonica')
         self.client.post(reverse('stock:compras'), {
@@ -1832,7 +1862,7 @@ class UsuariosDelSistemaTests(TestCase):
     def test_el_empleado_no_entra_al_modulo(self):
         self.client.force_login(self.empleado)
         respuesta = self.client.get(reverse('stock:usuario_list'))
-        self.assertRedirects(respuesta, reverse('stock:home'))
+        self.assertRedirects(respuesta, reverse('stock:calendario'))
 
     def test_el_empleado_tampoco_puede_crear_por_POST(self):
         """Esconder el boton no alcanza: la URL tiene que frenar sola."""
@@ -1846,11 +1876,11 @@ class UsuariosDelSistemaTests(TestCase):
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get(reverse('stock:usuario_list')).status_code, 200)
 
-    def test_el_empleado_sigue_usando_el_resto_del_sistema(self):
+    def test_el_empleado_sigue_usando_lo_suyo(self):
         """El rol no lo deja afuera de lo operativo, que es a lo que viene."""
         self.client.force_login(self.empleado)
-        self.assertEqual(self.client.get(reverse('stock:home')).status_code, 200)
-        self.assertEqual(self.client.get(reverse('stock:compras')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('stock:consumo_selector')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('stock:merma')).status_code, 200)
 
     # --- alta --------------------------------------------------------
 
@@ -1932,3 +1962,339 @@ class UsuariosDelSistemaTests(TestCase):
         respuesta = self.client.post(reverse('stock:usuario_delete', kwargs={'pk': self.admin.pk}))
         self.assertEqual(respuesta.status_code, 404)
         self.assertTrue(User.objects.filter(username='jefe').exists())
+
+
+class RolEmpleadoTests(TestCase):
+    """RN-25: el empleado carga consumos, carga merma y mira el calendario.
+
+    La lista blanca vive en stock/middleware.py. Estos tests son su contrato:
+    si alguien agrega una pantalla a PANTALLAS_DEL_EMPLEADO sin querer, o saca
+    una que hace falta, se entera aca y no en el salon un sabado a la noche.
+    """
+
+    def setUp(self):
+        self.empleado = User.objects.create_user('mozo', password='mozo-1234')
+        self.admin = User.objects.create_user('jefe', password='jefe-1234', is_staff=True)
+        self.producto = Producto.objects.create(
+            nombre='Fernet', sector='barra', precio_unitario=100, stock_actual=50
+        )
+        self.evento = Evento.objects.create(
+            nombre='Casamiento', fecha=date(2026, 9, 1), asistentes=100, estado='confirmado'
+        )
+        self.client.force_login(self.empleado)
+
+    # --- lo que SI puede -------------------------------------------------
+
+    def test_ve_sus_cuatro_pantallas(self):
+        permitidas = [
+            reverse('stock:calendario'),
+            reverse('stock:consumo_selector'),
+            reverse('stock:consumo_evento', kwargs={'evento_pk': self.evento.pk}),
+            reverse('stock:merma'),
+        ]
+        for url in permitidas:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_carga_consumo_y_el_stock_baja(self):
+        """Lo unico que el empleado TIENE que poder hacer."""
+        self.client.post(
+            reverse('stock:movimientostock_create', kwargs={'evento_pk': self.evento.pk}),
+            {'producto': self.producto.pk, 'tipo': 'salida', 'cantidad': '6'},
+        )
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 44)
+        self.assertTrue(
+            MovimientoStock.objects.filter(evento=self.evento, tipo='salida').exists()
+        )
+
+    def test_carga_merma(self):
+        self.client.post(reverse('stock:merma'), {
+            'producto_id': self.producto.pk, 'cantidad': '2', 'motivo': 'rotura',
+        })
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 48)
+
+    # --- corregir lo suyo ------------------------------------------------
+
+    def un_consumo(self, cantidad=6):
+        return MovimientoStock.objects.create(
+            producto=self.producto, evento=self.evento, tipo='salida', cantidad=cantidad
+        )
+
+    def test_ve_en_su_pantalla_lo_que_ya_cargo(self):
+        """Sin esta tabla no tiene desde donde llegar al boton de corregir."""
+        self.un_consumo()
+        respuesta = self.client.get(
+            reverse('stock:consumo_evento', kwargs={'evento_pk': self.evento.pk})
+        )
+        self.assertEqual(len(respuesta.context['cargado']), 1)
+
+    def test_corrige_la_cantidad_de_su_consumo(self):
+        movimiento = self.un_consumo(6)          # stock 50 -> 44
+        self.client.post(
+            reverse('stock:movimientostock_update', kwargs={'pk': movimiento.pk}),
+            {'producto': self.producto.pk, 'tipo': 'salida', 'cantidad': '8', 'motivo': ''},
+        )
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 42)
+
+    def test_borra_su_consumo_y_el_stock_vuelve(self):
+        movimiento = self.un_consumo(6)
+        self.client.post(reverse('stock:movimientostock_delete', kwargs={'pk': movimiento.pk}))
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 50)
+
+    def test_al_corregir_vuelve_a_su_pantalla_y_no_al_detalle_del_evento(self):
+        """Mandarlo a evento_detail seria rebotarlo con un cartel justo despues
+        de corregir bien: esa pantalla la tiene prohibida."""
+        movimiento = self.un_consumo()
+        respuesta = self.client.post(
+            reverse('stock:movimientostock_delete', kwargs={'pk': movimiento.pk})
+        )
+        self.assertRedirects(
+            respuesta, reverse('stock:consumo_evento', kwargs={'evento_pk': self.evento.pk})
+        )
+
+    def test_no_toca_las_compras_del_salon(self):
+        """Una reposicion de deposito no es suya: borrarla moveria el stock."""
+        compra = MovimientoStock.objects.create(
+            producto=self.producto, tipo='entrada', cantidad=20
+        )
+        url = reverse('stock:movimientostock_delete', kwargs={'pk': compra.pk})
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.post(url)
+        self.assertTrue(MovimientoStock.objects.filter(pk=compra.pk).exists())
+
+    def test_no_convierte_una_salida_en_entrada(self):
+        """Cambiarle el tipo seria inventar mercaderia que nunca llego."""
+        movimiento = self.un_consumo(6)          # stock 50 -> 44
+        self.client.post(
+            reverse('stock:movimientostock_update', kwargs={'pk': movimiento.pk}),
+            {'producto': self.producto.pk, 'tipo': 'entrada', 'cantidad': '6', 'motivo': ''},
+        )
+        movimiento.refresh_from_db()
+        self.producto.refresh_from_db()
+        self.assertEqual(movimiento.tipo, 'salida')
+        self.assertEqual(self.producto.stock_actual, 44)
+
+    # --- lo que NO puede -------------------------------------------------
+
+    def test_no_ve_las_pantallas_del_administrador(self):
+        prohibidas = [
+            reverse('stock:producto_list'),
+            reverse('stock:compras'),
+            reverse('stock:movimiento_list'),
+            reverse('stock:evento_list'),
+            reverse('stock:evento_historial'),
+            reverse('stock:evento_detail', kwargs={'pk': self.evento.pk}),
+            reverse('stock:empleado_list'),
+            reverse('stock:menu_list'),
+            reverse('stock:paquete_list'),
+            reverse('stock:puesto_list'),
+            reverse('stock:usuario_list'),
+        ]
+        for url in prohibidas:
+            with self.subTest(url=url):
+                self.assertRedirects(self.client.get(url), reverse('stock:calendario'))
+
+    def test_no_borra_un_evento_ni_por_POST(self):
+        """Esconder el boton no alcanza: la URL suelta tiene que frenar sola."""
+        self.client.post(reverse('stock:evento_delete', kwargs={'pk': self.evento.pk}))
+        self.assertTrue(Evento.objects.filter(pk=self.evento.pk).exists())
+
+    def test_no_carga_personal_ni_pagos(self):
+        empleado = Empleado.objects.create(nombre='Juan')
+        self.client.post(
+            reverse('stock:personalevento_create', kwargs={'evento_pk': self.evento.pk}),
+            {'empleado': empleado.pk, 'puesto': un_puesto().pk,
+             'horas_trabajadas': '8', 'pago': '10000'},
+        )
+        self.assertFalse(PersonalEvento.objects.exists())
+
+    def test_el_calendario_no_le_ofrece_el_detalle_del_evento(self):
+        """La pantalla que SI ve no puede tener la puerta a la que no ve."""
+        respuesta = self.client.get(reverse('stock:calendario'))
+        self.assertNotContains(
+            respuesta, reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+        )
+
+    # --- la casa del empleado -------------------------------------------
+
+    def test_el_panel_lo_manda_al_calendario_sin_retarlo(self):
+        """`home` es LOGIN_REDIRECT_URL: cae ahi en cada ingreso sin tocar nada.
+
+        Si eso disparara el mensaje de "solo para administradores", el empleado
+        veria un modal de error cada vez que entra al sistema.
+        """
+        respuesta = self.client.get(reverse('stock:home'), follow=True)
+        self.assertRedirects(respuesta, reverse('stock:calendario'))
+        self.assertEqual(list(respuesta.context['messages']), [])
+
+    def test_al_administrador_no_le_cambia_nada(self):
+        self.client.force_login(self.admin)
+        for url in [reverse('stock:home'), reverse('stock:producto_list'),
+                    reverse('stock:evento_detail', kwargs={'pk': self.evento.pk}),
+                    reverse('stock:usuario_list')]:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class UnidadesDeMedidaTests(TestCase):
+    """RN-26: la unidad es un catalogo que carga el dueno, no texto libre."""
+
+    def setUp(self):
+        self.usuario = User.objects.create_user('admin', password='x-1234', is_staff=True)
+        self.client.force_login(self.usuario)
+
+    def test_la_migracion_dejo_las_cuatro_del_dueno(self):
+        self.assertEqual(
+            sorted(UnidadMedida.objects.values_list('nombre', flat=True)),
+            ['Cajas', 'Kilogramos', 'Litros', 'Unidad'],
+        )
+
+    def test_se_puede_cargar_una_unidad_nueva(self):
+        """El punto de que sea tabla: agregar 'Botellas' no espera un deploy."""
+        self.client.post(reverse('stock:unidad_create'), {'nombre': 'Botellas'})
+        self.assertTrue(UnidadMedida.objects.filter(nombre='Botellas').exists())
+
+    def test_no_se_repite_una_unidad(self):
+        respuesta = self.client.post(reverse('stock:unidad_create'), {'nombre': 'Litros'})
+        self.assertEqual(respuesta.status_code, 200, 'tiene que volver con el error')
+        self.assertEqual(UnidadMedida.objects.filter(nombre='Litros').count(), 1)
+
+    def test_una_unidad_sin_uso_se_borra(self):
+        unidad = UnidadMedida.objects.create(nombre='Bidones')
+        self.client.post(reverse('stock:unidad_delete', kwargs={'pk': unidad.pk}))
+        self.assertFalse(UnidadMedida.objects.filter(pk=unidad.pk).exists())
+
+    def test_una_unidad_en_uso_no_se_borra_y_avisa(self):
+        """Sin unidad el stock queda en un numero suelto: '50' de que."""
+        unidad = una_unidad('Kilogramos')
+        Producto.objects.create(
+            nombre='Carne', sector='cocina', stock_actual=20, unidad_medida=unidad
+        )
+
+        respuesta = self.client.post(
+            reverse('stock:unidad_delete', kwargs={'pk': unidad.pk}), follow=True
+        )
+
+        self.assertTrue(UnidadMedida.objects.filter(pk=unidad.pk).exists())
+        self.assertIn('no se puede borrar', str(list(respuesta.context['messages'])[0]))
+
+    def test_el_producto_muestra_el_nombre_de_su_unidad(self):
+        """Los 15 templates dicen {{ producto.unidad_medida }} y no se tocaron:
+        con FK eso sale por __str__, asi que tiene que leerse igual que antes."""
+        producto = Producto.objects.create(
+            nombre='Fernet', sector='barra', stock_actual=5,
+            unidad_medida=una_unidad('Litros'),
+        )
+        self.assertEqual(f'{producto.stock_actual:.0f} {producto.unidad_medida}', '5 Litros')
+
+
+class ImprimirYModalTests(TestCase):
+    """RN-28: el PDF lo hace el navegador, y el modal separa sus secciones."""
+
+    def setUp(self):
+        self.usuario = User.objects.create_user('admin', password='x-1234', is_staff=True)
+        self.client.force_login(self.usuario)
+        self.evento = Evento.objects.create(
+            nombre='Boda', fecha=date(2026, 9, 1), asistentes=100
+        )
+        Producto.objects.create(
+            nombre='Fernet', sector='barra', stock_actual=10, unidad_medida=una_unidad()
+        )
+
+    def test_las_tres_pantallas_tienen_el_boton(self):
+        pantallas = [
+            reverse('stock:evento_detail', kwargs={'pk': self.evento.pk}),
+            reverse('stock:producto_list'),
+            reverse('stock:evento_list'),
+        ]
+        for url in pantallas:
+            with self.subTest(url=url):
+                html = self.client.get(url).content.decode()
+                self.assertIn('window.print()', html)
+                self.assertIn('Descargar PDF', html)
+
+    def test_el_boton_no_se_imprime_a_si_mismo(self):
+        """Sin `no-print` el PDF sale con el boton de descargar PDF adentro."""
+        html = self.client.get(reverse('stock:producto_list')).content.decode()
+        boton = html[html.index('window.print()') - 400:html.index('window.print()')]
+        self.assertIn('no-print', boton)
+
+    def test_el_modal_separa_las_secciones(self):
+        """El <main> de base.html separa con gap; el fragmento no lo tenia.
+
+        Sin esto, el detalle de un evento salia con todas sus secciones pegadas
+        una abajo de la otra, y SOLO dentro del modal.
+        """
+        respuesta = self.client.get(
+            reverse('stock:evento_detail', kwargs={'pk': self.evento.pk}),
+            headers={'x-requested-with': 'XMLHttpRequest'},
+        )
+        html = respuesta.content.decode()
+        self.assertNotIn('<html', html, 'el fragmento no trae la pagina entera (RN-22)')
+        self.assertIn('flex flex-col gap-stack-lg', html)
+
+    def test_la_tira_de_datos_no_usa_breakpoints_de_ventana(self):
+        """grid-datos mide el contenedor; lg:grid-cols-6 mide la ventana, y en
+        el modal dejaba las seis columnas encimadas."""
+        html = self.client.get(
+            reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+        ).content.decode()
+        self.assertIn('class="grid-datos"', html)
+        # El patron exacto que habia, para que nadie lo reponga sin darse cuenta.
+        self.assertNotIn('grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6', html)
+
+
+class VolverALaPestanaTests(TestCase):
+    """Tocar un producto de Extras tiene que devolverte a Extras, no a Barra."""
+
+    def setUp(self):
+        self.usuario = User.objects.create_user('admin', password='x-1234', is_staff=True)
+        self.client.force_login(self.usuario)
+        self.producto = Producto.objects.create(
+            nombre='Servilletas', sector='extras', stock_actual=100,
+            unidad_medida=una_unidad(),
+        )
+
+    def test_al_crear_vuelve_a_la_pestana_del_sector(self):
+        respuesta = self.client.post(reverse('stock:producto_create'), {
+            'nombre': 'Lavandina', 'sector': 'limpieza', 'precio_unitario': '900',
+            'stock_actual': '4', 'unidad_medida': una_unidad('Litros').pk,
+        })
+        self.assertTrue(respuesta.url.endswith('#limpieza-pane'), respuesta.url)
+
+    def test_al_editar_vuelve_a_la_pestana_del_sector(self):
+        respuesta = self.client.post(
+            reverse('stock:producto_update', kwargs={'pk': self.producto.pk}),
+            {'nombre': 'Servilletas', 'sector': 'extras', 'precio_unitario': '100',
+             'unidad_medida': una_unidad().pk},
+        )
+        self.assertTrue(respuesta.url.endswith('#extras-pane'), respuesta.url)
+
+    def test_al_borrar_vuelve_a_la_pestana_del_sector(self):
+        respuesta = self.client.post(
+            reverse('stock:producto_delete', kwargs={'pk': self.producto.pk})
+        )
+        self.assertTrue(respuesta.url.endswith('#extras-pane'), respuesta.url)
+
+    def test_al_dar_de_baja_uno_con_historial_tambien_vuelve_a_su_pestana(self):
+        """El camino del ProtectedError es otro `return`: se olvida facil."""
+        MovimientoStock.objects.create(producto=self.producto, tipo='entrada', cantidad=5)
+
+        respuesta = self.client.post(
+            reverse('stock:producto_delete', kwargs={'pk': self.producto.pk})
+        )
+
+        self.producto.refresh_from_db()
+        self.assertFalse(self.producto.activo, 'con historial se da de baja, no se borra')
+        self.assertTrue(respuesta.url.endswith('#extras-pane'), respuesta.url)
+
+    def test_al_reactivar_tambien(self):
+        self.producto.dar_de_baja()
+        respuesta = self.client.post(
+            reverse('stock:producto_reactivar', kwargs={'pk': self.producto.pk})
+        )
+        self.assertTrue(respuesta.url.endswith('#extras-pane'), respuesta.url)

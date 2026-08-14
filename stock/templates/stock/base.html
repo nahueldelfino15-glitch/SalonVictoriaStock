@@ -281,6 +281,86 @@
   /* --- Latido del esqueleto mientras carga un modal ---------------------- */
   @keyframes latido { 0%, 100% { opacity: .35; } 50% { opacity: .15; } }
   .cargando { animation: latido 1.2s ease-in-out infinite; }
+
+  /* --- Tira de datos: se acomoda al CONTENEDOR, no a la ventana -----------
+     Los breakpoints de Tailwind (lg:grid-cols-6) miran el viewport. Dentro del
+     modal, que es angoso pero vive en una ventana grande, eso dejaba las seis
+     columnas aplastadas y el chip de Estado se montaba sobre Paquete.
+     auto-fit + minmax es CSS puro y mide el ancho real disponible, asi que
+     sirve igual en la pantalla suelta y en el modal.                        */
+  .grid-datos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  /* --- Impresion / "Descargar PDF" ---------------------------------------
+     No hay libreria de PDF: el navegador ya sabe hacerlo ("Guardar como PDF"
+     es un destino de impresion). Aca solo se le saca de encima lo que no va en
+     papel y se pasa a tinta negra sobre blanco: el tema noir en una hoja son
+     30 MB de toner y no se lee.                                             */
+  @media print {
+    @page { margin: 14mm; }
+
+    /* El panel lateral, la barra, los botones y los modales no se imprimen.
+       Va por clase y no por etiqueta: los <header> de las pantallas (el titulo
+       del evento) SI tienen que salir en el papel. */
+    .no-print, [data-modal], #modalRemoto { display: none !important; }
+
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+      font-size: 11pt;
+    }
+    html[data-sidebar] main, main {
+      margin: 0 !important;
+      padding: 0 !important;
+      max-width: none !important;
+      min-height: 0 !important;
+      gap: 14px !important;
+    }
+
+    /* Sobre blanco, las capas de tono del tema no separan nada: el borde si. */
+    *, *::before, *::after {
+      background: transparent !important;
+      color: #000000 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+    section, .bg-surface-raised, table {
+      border: 1px solid #999999 !important;
+      border-radius: 0 !important;
+    }
+    thead tr { border-bottom: 2px solid #000000 !important; }
+    tbody tr { border-bottom: 1px solid #cccccc !important; }
+    th, td { padding: 4px 8px !important; }
+
+    /* Que una tabla no se parta al medio entre dos hojas. */
+    table, tr, section { break-inside: avoid; page-break-inside: avoid; }
+    h1, h2 { break-after: avoid; page-break-after: avoid; }
+
+    /* Las tablas con scroll horizontal en pantalla, en papel entran enteras. */
+    .overflow-x-auto { overflow: visible !important; }
+    .whitespace-nowrap { white-space: normal !important; }
+
+    /* Solo la pestana abierta: en papel no hay donde hacer click. */
+    [data-tab-panel][hidden] { display: none !important; }
+
+    /* Y por lo mismo, tampoco los controles. Los iconos de accion se agarran
+       por aria-label para no llevarse puestos los links que son texto. */
+    button,
+    .luxury-button-primary,
+    .luxury-button-secondary,
+    [aria-label="Editar"], [aria-label="Eliminar"],
+    [aria-label="Ver detalle"], [aria-label="Cambiar contraseña"] { display: none !important; }
+
+    /* La columna "Acciones" queda vacia: se va con su encabezado. */
+    .col-acciones { display: none !important; }
+  }
+
+  /* Se ve solo en el papel: quien lo emitio y cuando. */
+  .solo-impresion { display: none; }
+  @media print { .solo-impresion { display: block !important; } }
 </style>
 </head>
 
@@ -299,7 +379,7 @@ prendería TODO el nav.
 {% with cls_on="sidebar-item flex items-center gap-stack-md h-11 px-stack-md rounded-lg border-l-2 border-primary bg-surface-container-low text-primary font-semibold transition-colors" cls_off="sidebar-item flex items-center gap-stack-md h-11 px-stack-md rounded-lg border-l-2 border-transparent text-secondary hover:text-primary hover:bg-surface-container-low transition-colors" %}
 
 <!-- ============================ Barra superior ============================ -->
-<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center gap-stack-md px-stack-md lg:px-stack-lg h-16 bg-surface-container-lowest border-b border-outline-variant ambient-shadow">
+<header class="no-print fixed top-0 left-0 w-full z-50 flex justify-between items-center gap-stack-md px-stack-md lg:px-stack-lg h-16 bg-surface-container-lowest border-b border-outline-variant ambient-shadow">
 
   <div class="flex items-center gap-stack-sm min-w-0">
     <button type="button" id="sidebarToggle" aria-label="Contraer o expandir el menú" aria-controls="sidebar"
@@ -307,7 +387,8 @@ prendería TODO el nav.
       <span class="material-symbols-outlined">menu</span>
     </button>
 
-    <a class="flex items-center gap-stack-sm shrink-0 group min-w-0" href="{% url 'stock:home' %}">
+    {# El empleado no entra al panel: su casa es el calendario (RN-25). #}
+    <a class="flex items-center gap-stack-sm shrink-0 group min-w-0" href="{% if user.is_staff %}{% url 'stock:home' %}{% else %}{% url 'stock:calendario' %}{% endif %}">
       <img alt="Salón Victoria" class="h-9 w-auto object-contain" src="{% static 'stock/img/LogoVictoria.png' %}">
       <span class="font-display-lg text-[20px] font-semibold leading-none text-on-background group-hover:text-primary transition-colors truncate">Victoria</span>
     </a>
@@ -326,8 +407,26 @@ prendería TODO el nav.
 </header>
 
 <!-- ============================ Panel lateral ============================ -->
-<aside id="sidebar" class="sidebar fixed top-16 left-0 bottom-0 z-40 bg-surface-container-lowest border-r border-outline-variant overflow-y-auto overflow-x-hidden py-stack-md">
+<aside id="sidebar" class="no-print sidebar fixed top-16 left-0 bottom-0 z-40 bg-surface-container-lowest border-r border-outline-variant overflow-y-auto overflow-x-hidden py-stack-md">
   <nav class="flex flex-col gap-unit px-stack-sm font-body-md text-body-md" aria-label="Navegación principal">
+
+    {% comment %}
+    El menú del empleado va aparte y no como diez {% templatetag openblock %} if {% templatetag closeblock %} intercalados en el del
+    administrador (RN-25). Son tres links repetidos contra un nav ilegible, y de
+    paso el del administrador queda intacto: lo que no se toca, no se rompe.
+    Esconder links es prolijidad; lo que frena de verdad es RolEmpleadoMiddleware.
+    {% endcomment %}
+    {% if not user.is_staff %}
+    <a title="Calendario" class="{% if un in '|calendario|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:calendario' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">calendar_month</span><span class="sidebar-label truncate">Calendario</span>
+    </a>
+    <a title="Consumo" class="{% if un in '|consumo_selector|consumo_evento|movimientostock_create|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:consumo_selector' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">local_bar</span><span class="sidebar-label truncate">Consumo</span>
+    </a>
+    <a title="Merma" class="{% if un in '|merma|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:merma' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">delete_sweep</span><span class="sidebar-label truncate">Merma</span>
+    </a>
+    {% else %}
 
     <a title="Panel" class="{% if un in '|home|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:home' %}">
       <span class="material-symbols-outlined text-[22px] shrink-0">dashboard</span><span class="sidebar-label truncate">Panel</span>
@@ -374,13 +473,10 @@ prendería TODO el nav.
     <a title="Puestos" class="{% if un in '|puesto_list|puesto_create|puesto_update|puesto_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:puesto_list' %}">
       <span class="material-symbols-outlined text-[22px] shrink-0">badge</span><span class="sidebar-label truncate">Puestos</span>
     </a>
+    <a title="Unidades de medida" class="{% if un in '|unidad_list|unidad_create|unidad_update|unidad_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:unidad_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">straighten</span><span class="sidebar-label truncate">Unidades</span>
+    </a>
 
-    {% comment %}
-    Todo este grupo es del administrador (RN-25). El empleado no lo ve, y si
-    llega a la URL igual lo frena SoloAdminMixin: esconder el link es prolijidad,
-    no seguridad.
-    {% endcomment %}
-    {% if user.is_staff %}
     <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Sistema</p>
     <a title="Avisos por mail" class="{% if un in '|destinatario_list|destinatario_create|destinatario_update|destinatario_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:destinatario_list' %}">
       <span class="material-symbols-outlined text-[22px] shrink-0">forward_to_inbox</span><span class="sidebar-label truncate">Avisos</span>
@@ -391,7 +487,7 @@ prendería TODO el nav.
     <a title="Admin" class="{{ cls_off }}" href="/admin/">
       <span class="material-symbols-outlined text-[22px] shrink-0">settings</span><span class="sidebar-label truncate">Admin</span>
     </a>
-    {% endif %}
+    {% endif %}{# /rol #}
   </nav>
 </aside>
 
@@ -405,6 +501,11 @@ prendería TODO el nav.
 <!-- ============================ Contenido ============================ -->
 <div class="contenido">
   <main class="max-w-[1200px] mx-auto px-stack-md sm:px-container-padding pt-[88px] pb-container-padding min-h-screen flex flex-col gap-stack-lg">
+    {# Membrete del papel: en pantalla no se ve (la barra ya dice todo esto). #}
+    <div class="solo-impresion" style="border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:4px;">
+      <strong style="font-size:13pt;">Salón Victoria</strong>
+      <span style="float:right;font-size:9pt;">Emitido el {% now "d/m/Y" %}</span>
+    </div>
     {% block content %}{% endblock %}
   </main>
 </div>

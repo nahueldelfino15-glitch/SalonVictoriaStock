@@ -5,7 +5,6 @@ from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
-from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -31,6 +30,7 @@ from .models import (
     Producto,
     Puesto,
     TarjetaEvento,
+    UnidadMedida,
 )
 
 
@@ -78,27 +78,6 @@ def parsear_entero(valor):
     except (TypeError, ValueError):
         return None
 
-# ---------- Roles: quién ve qué (RN-25) ----------
-class SoloAdminMixin(UserPassesTestMixin):
-    """Cuelga esto de una vista y la ve solo el administrador.
-
-    El rol vive en `User.is_staff`, que Django ya trae: dos roles son un
-    booleano, no una tabla nueva con su FK y su migración. De yapa, ese mismo
-    flag es el que cierra /admin/, así que el empleado queda afuera de las dos
-    puertas con una sola marca.
-    """
-
-    def test_func(self):
-        return self.request.user.is_staff
-
-    def handle_no_permission(self):
-        # Un 403 pelado no le dice nada a nadie. La sesión ya existe (la exige
-        # LoginRequiredMiddleware), así que lo único que cae acá es un empleado
-        # tocando una URL que no le toca.
-        messages.error(self.request, 'Esa pantalla es solo para administradores.')
-        return redirect('stock:home')
-
-
 def home(request):
     year = request.GET.get('year')
     month = request.GET.get('month')
@@ -142,6 +121,19 @@ class ProductoListView(ListView):
         return context
 
 
+def volver_al_sector(producto):
+    """El listado de productos, abierto en la pestaña del sector que se tocó.
+
+    Sin el fragmento el listado abre siempre en Barra: tocás un producto de
+    Extras y al guardar aparecés en otra pestaña, buscando de nuevo dónde
+    estabas. Es el mismo patrón que ya usaban Compras y Merma (RN-4); lo que
+    faltaba era acá.
+
+    Los `<sector>-pane` son contrato con el helper de pestañas de base.html.
+    """
+    return f"{reverse('stock:producto_list')}#{producto.sector}-pane"
+
+
 class ProductoDetailView(DetailView):
     model = Producto
     template_name = 'stock/producto_detail.html'
@@ -151,7 +143,9 @@ class ProductoCreateView(CreateView):
     model = Producto
     fields = ['nombre', 'sector', 'precio_unitario', 'stock_actual', 'unidad_medida']
     template_name = 'stock/producto_form.html'
-    success_url = reverse_lazy('stock:producto_list')
+
+    def get_success_url(self):
+        return volver_al_sector(self.object)
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
@@ -186,7 +180,9 @@ class ProductoUpdateView(UpdateView):
     # stock_actual NO se edita a mano (RN-1): se mueve con compras y consumo.
     fields = ['nombre', 'sector', 'precio_unitario', 'unidad_medida']
     template_name = 'stock/producto_form.html'
-    success_url = reverse_lazy('stock:producto_list')
+
+    def get_success_url(self):
+        return volver_al_sector(self.object)
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
@@ -210,7 +206,9 @@ def preparar_precio(form):
 class ProductoDeleteView(DeleteView):
     model = Producto
     template_name = 'stock/producto_confirm_delete.html'
-    success_url = reverse_lazy('stock:producto_list')
+
+    def get_success_url(self):
+        return volver_al_sector(self.object)
 
     def form_valid(self, form):
         """Si el producto tiene historial no se borra: se da de baja (RN-20).
@@ -229,7 +227,7 @@ class ProductoDeleteView(DeleteView):
                 f'"{producto.nombre}" tiene movimientos cargados, así que lo dimos de baja en vez '
                 'de borrarlo. Sale de Compras, Consumo y Merma, pero su historial queda intacto.',
             )
-            return redirect(self.success_url)
+            return redirect(self.get_success_url())
 
         messages.success(self.request, f'Borramos "{producto.nombre}".')
         return respuesta
@@ -242,7 +240,7 @@ def reactivar_producto(request, pk):
         producto.activo = True
         producto.save(update_fields=['activo'])
         messages.success(request, f'"{producto.nombre}" volvió a estar disponible.')
-    return redirect('stock:producto_list')
+    return redirect(volver_al_sector(producto))
 
 
 # ---------- Evento ----------
@@ -286,10 +284,11 @@ class EventoDetailView(DetailView):
     template_name = 'stock/evento_detail.html'
 
 
+# El evento no pide precio por cubierto: eso se carga tarjeta por tarjeta, que es
+# donde se distingue cuántos son de cada menú (RN-17).
 CAMPOS_EVENTO = [
     'nombre', 'fecha', 'asistentes', 'estado', 'paquete', 'menu',
-    'precio_por_persona', 'precio_cerrado', 'precio_paquete',
-    'brindis_asistentes', 'brindis_valor',
+    'precio_paquete', 'brindis_asistentes', 'brindis_valor',
     'telefono_contacto', 'notas',
 ]
 
@@ -458,6 +457,52 @@ class PuestoDeleteView(DeleteView):
                 f'"{puesto.nombre}" está usado en {puesto.asignaciones.count()} asignación'
                 f'{"es" if puesto.asignaciones.count() != 1 else ""} de personal, así que no se '
                 'puede borrar. Cambiales el puesto primero si querés sacarlo.',
+            )
+            return redirect(self.success_url)
+
+
+# ---------- Unidades de medida (RN-26) ----------
+class UnidadMedidaListView(ListView):
+    model = UnidadMedida
+    template_name = 'stock/unidad_list.html'
+    context_object_name = 'unidades'
+
+
+class UnidadMedidaCreateView(CreateView):
+    model = UnidadMedida
+    fields = ['nombre']
+    template_name = 'stock/unidad_form.html'
+    success_url = reverse_lazy('stock:unidad_list')
+
+
+class UnidadMedidaUpdateView(UpdateView):
+    model = UnidadMedida
+    fields = ['nombre']
+    template_name = 'stock/unidad_form.html'
+    success_url = reverse_lazy('stock:unidad_list')
+
+
+class UnidadMedidaDeleteView(DeleteView):
+    model = UnidadMedida
+    template_name = 'stock/unidad_confirm_delete.html'
+    success_url = reverse_lazy('stock:unidad_list')
+
+    def form_valid(self, form):
+        """Una unidad en uso no se borra: es lo que le da sentido al stock.
+
+        Sin ella el fernet queda en "50" a secas, que no es un dato. Mismo
+        criterio que con los puestos (RN-21).
+        """
+        unidad = self.object
+        try:
+            with transaction.atomic():
+                return super().form_valid(form)
+        except ProtectedError:
+            usados = unidad.productos.count()
+            messages.error(
+                self.request,
+                f'"{unidad.nombre}" la usan {usados} producto{"s" if usados != 1 else ""}, '
+                'así que no se puede borrar. Cambiales la unidad primero si querés sacarla.',
             )
             return redirect(self.success_url)
 
@@ -896,20 +941,41 @@ class MovimientoStockListView(ListView):
         return context
 
 
-def volver_del_movimiento(movimiento):
+def volver_del_movimiento(movimiento, usuario=None):
     """A dónde se vuelve después de editar o borrar un movimiento.
 
     Las compras y las mermas NO tienen evento: mandarlas a evento_detail era un
     AttributeError. Cada una vuelve a la pantalla de donde salió.
     """
     if movimiento.evento_id:
+        # El empleado no puede abrir el detalle del evento (RN-25): mandarlo ahí
+        # sería rebotarlo al calendario con un cartel de error justo después de
+        # corregir bien. Vuelve a la pantalla desde la que cargó.
+        if usuario is not None and not usuario.is_staff:
+            return reverse('stock:consumo_evento', kwargs={'evento_pk': movimiento.evento_id})
         return reverse('stock:evento_detail', kwargs={'pk': movimiento.evento_id})
     if movimiento.tipo == 'merma':
         return reverse('stock:merma')
     return reverse('stock:compras')
 
 
-class MovimientoStockUpdateView(UpdateView):
+class MovimientoDelEmpleadoMixin:
+    """El empleado corrige lo que carga él: consumos y mermas. Las compras no.
+
+    Sin este filtro, abrirle editar/borrar (RN-25) le abría TODO el libro mayor
+    por URL directa: podía borrar una reposición de depósito de medio millón de
+    pesos, y el stock se movía de verdad. Va en el queryset y no en el template
+    porque el botón se esconde, la URL no: lo que queda afuera da 404.
+    """
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.is_staff:
+            return queryset
+        return queryset.exclude(tipo='entrada')
+
+
+class MovimientoStockUpdateView(MovimientoDelEmpleadoMixin, UpdateView):
     model = MovimientoStock
     # 'motivo' va en el form aunque solo lo use la merma: si clean() apunta un
     # error a un campo que el form no declara, Django tira 500 en vez de
@@ -917,21 +983,30 @@ class MovimientoStockUpdateView(UpdateView):
     fields = ['producto', 'tipo', 'cantidad', 'motivo']
     template_name = 'stock/movimientostock_form.html'
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if not self.request.user.is_staff:
+            # El empleado corrige la cantidad, no convierte una salida en
+            # entrada: eso sería inventar mercadería que nunca llegó. `disabled`
+            # además ignora lo que venga por POST, no solo lo pinta gris.
+            form.fields['tipo'].disabled = True
+        return form
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['evento'] = self.object.evento
         return context
 
     def get_success_url(self):
-        return volver_del_movimiento(self.object)
+        return volver_del_movimiento(self.object, self.request.user)
 
 
-class MovimientoStockDeleteView(DeleteView):
+class MovimientoStockDeleteView(MovimientoDelEmpleadoMixin, DeleteView):
     model = MovimientoStock
     template_name = 'stock/movimientostock_confirm_delete.html'
 
     def get_success_url(self):
-        return volver_del_movimiento(self.object)
+        return volver_del_movimiento(self.object, self.request.user)
     
 # ---------- Paquete ----------
 class PaqueteListView(ListView):
@@ -1175,6 +1250,15 @@ def consumo_evento(request, evento_pk):
     context['evento'] = evento
     context['empleados'] = Empleado.objects.select_related('puesto_habitual').order_by('nombre')
     context['puestos'] = Puesto.objects.all()
+    # Lo ya cargado, para poder corregirlo (RN-25). El empleado no tiene ninguna
+    # otra pantalla donde verlo: el historial y el detalle del evento son del
+    # administrador, así que sin esta tabla "puede editar" era letra muerta.
+    context['cargado'] = (
+        evento.movimientos
+        .exclude(tipo='entrada')
+        .select_related('producto')
+        .order_by('-fecha', '-pk')
+    )
     return render(request, 'stock/consumo_evento.html', context)
 
 
@@ -1205,7 +1289,7 @@ def preparar_rol(form):
     )
 
 
-class UsuarioListView(SoloAdminMixin, ListView):
+class UsuarioListView(ListView):
     model = User
     template_name = 'stock/usuario_list.html'
     context_object_name = 'usuarios'
@@ -1224,7 +1308,7 @@ class UsuarioListView(SoloAdminMixin, ListView):
         return context
 
 
-class UsuarioCreateView(SoloAdminMixin, CreateView):
+class UsuarioCreateView(CreateView):
     model = User
     form_class = UsuarioCreationForm
     template_name = 'stock/usuario_form.html'
@@ -1245,7 +1329,7 @@ class UsuarioCreateView(SoloAdminMixin, CreateView):
         return respuesta
 
 
-class UsuarioUpdateView(SoloAdminMixin, UpdateView):
+class UsuarioUpdateView(UpdateView):
     model = User
     # La contraseña no se toca acá: tiene pantalla propia, con la repetición y
     # los validadores. Mezclarla con el resto obligaría a reescribirla cada vez
@@ -1281,7 +1365,7 @@ class UsuarioUpdateView(SoloAdminMixin, UpdateView):
         return super().form_valid(form)
 
 
-class UsuarioPasswordView(SoloAdminMixin, UpdateView):
+class UsuarioPasswordView(UpdateView):
     """Cambiarle la contraseña a otro: el olvido es el soporte real de esto."""
 
     model = User
@@ -1307,7 +1391,7 @@ class UsuarioPasswordView(SoloAdminMixin, UpdateView):
         return respuesta
 
 
-class UsuarioDeleteView(SoloAdminMixin, DeleteView):
+class UsuarioDeleteView(DeleteView):
     model = User
     template_name = 'stock/usuario_confirm_delete.html'
     success_url = reverse_lazy('stock:usuario_list')

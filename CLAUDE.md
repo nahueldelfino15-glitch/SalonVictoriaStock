@@ -86,7 +86,11 @@ Menu ─────┼──> Evento <── PersonalEvento ──> Empleado �
 ### `Producto`
 Unidad de stock. `sector` ∈ `barra | cocina | extras | limpieza | mobiliario` (RN-8).
 Campos: `nombre`, `sector`, `precio_unitario` (Decimal 10,2, **opcional**), `stock_actual`
-(Decimal 10,2), `unidad_medida` (texto libre, default `'unidad'`), `activo` (baja lógica, RN-20).
+(Decimal 10,2), `unidad_medida` (FK a `UnidadMedida`, **PROTECT**, RN-26),
+`activo` (baja lógica, RN-20).
+
+### `UnidadMedida`
+Catálogo administrable desde `/unidades/`. Solo `nombre` (único). Ver RN-26.
 
 ### `DestinatarioAviso`
 A quién le llegan los recordatorios por mail. `email` (único), `nombre`, `activo`.
@@ -99,7 +103,7 @@ Ambos con `on_delete=SET_NULL` desde `Evento`.
 ### `Evento`
 Núcleo del sistema. `estado` ∈ `pendiente | confirmado | finalizado`.
 Campos: `nombre`, `fecha` (DateField, sin hora), `asistentes`, `estado`, `paquete` (FK opcional), `menu` (FK opcional), `telefono_contacto`, `notas`.
-Plata: `precio_cerrado`, `precio_por_persona`, `precio_paquete` (sellado, RN-17),
+Plata: `precio_paquete` (sellado, RN-17),
 `brindis_asistentes`, `brindis_valor`.
 Propiedades calculadas: `ingreso_*`, `desglose_ingresos`, `margen`, `gasto_stock`,
 `gasto_personal`, `gasto_total`.
@@ -321,19 +325,32 @@ El sistema dejó de medir solo costos.
 ingreso_tarjetas = Σ (tarjeta.cantidad × tarjeta.valor_unitario)     ← RN-23
 ingreso_brindis  = brindis_asistentes × brindis_valor
 ingreso_paquete  = precio_paquete            (monto TOTAL, sellado)
-ingreso_base     = precio_cerrado + precio_por_persona × asistentes
 ingreso_cargos   = Σ CargoEvento.monto
 
-ingreso_total    = tarjetas + brindis + paquete + base + cargos
+ingreso_total    = tarjetas + brindis + paquete + cargos
 margen           = ingreso_total − gasto_stock − gasto_personal
 ```
 
-**Todo suma; nada pisa a nada.** Antes el `precio_cerrado` mandaba sobre el
-`precio_por_persona`; el dueño pidió que se sumen. La contra es real: cargar las
-tarjetas Y el precio por persona factura la misma plata dos veces. Por eso existe
-`Evento.desglose_ingresos` y la pantalla muestra **cada renglón abierto** — con un
-total pelado eso no se ve nunca; con el detalle a la vista, sí. El desglose es
-parte de la regla, no decoración.
+#### El cubierto se cobra en UN solo lugar: las tarjetas
+El evento **no tiene precio propio**. `precio_cerrado` y `precio_por_persona`
+existieron y **se eliminaron** (migración `0016`).
+
+El problema no era que estuvieran de más, era que **sumaban en paralelo a las
+tarjetas**. Una fiesta de 100 con las tarjetas bien cargadas (80 adultos + 20
+infantil) y además el precio por persona lleno facturaba la misma comida dos
+veces, y el total salía con total confianza. El desglose abierto lo dejaba ver,
+pero avisar de un dato mal sumado es peor que no poder cargarlo mal.
+
+La tabla de tarjetas gana además por precisión: es la única que distingue cuántos
+son de cada menú. `precio_por_persona × asistentes` asume un precio único para
+todos, que es justo el caso que el dueño **no** tiene.
+
+⚠️ La tarjeta trae su **propia cantidad**, así que no depende de `Evento.asistentes`.
+Eso arregla de paso el "Casamiento Nascar" (0 asistentes cargados): antes facturaba
+$0 hasta que alguien corrigiera el número.
+
+`Evento.desglose_ingresos` sigue mostrando **cada renglón abierto**: con un total
+pelado no se ve de dónde sale cada peso; con el detalle a la vista, sí.
 
 `CargoEvento` son los adicionales facturables (barra libre, DJ, hora extra).
 **Se llama CARGO y no "extra" a propósito**: `extras` ya es un sector de stock
@@ -594,21 +611,90 @@ nuevo ni un `Group`: es `User.is_staff`.
 | `is_staff` | Rol | Qué puede |
 |-----------|-----|-----------|
 | `True` | Administrador | Todo el sistema, `/usuarios/` y `/admin/` |
-| `False` | Empleado | Todo menos `/usuarios/` (el recorte fino está por definirse) |
+| `False` | Empleado | Cargar consumo, cargar merma y ver el calendario. **Nada más** |
 
 Dos roles son un booleano. Una tabla `Rol` con su FK, su migración y su CRUD para
 guardar un bit sería el clásico caso de construir el edificio antes de saber si
 hay inquilinos. Y `is_staff` de yapa **cierra `/admin/` solo**: el empleado queda
 afuera de las dos puertas con una sola marca, sin código de por medio.
 
-El gating es `SoloAdminMixin` (en `views.py`): `test_func` mira `is_staff` y
-`handle_no_permission` redirige a la home con un mensaje en vez de tirar un 403
-pelado — la sesión ya existe (la exige `LoginRequiredMiddleware`), así que lo
-único que cae ahí es un empleado tocando una URL que no le toca. **Para restringir
-otra pantalla al administrador, alcanza con colgarle el mixin.**
+#### El permiso se decide por LISTA BLANCA, en un middleware
 
-El grupo "Sistema" del sidebar va dentro de `{% if user.is_staff %}`. Esconder el
-link es prolijidad; lo que frena de verdad es el mixin.
+`stock/middleware.py` tiene la lista completa de lo que un empleado puede tocar:
+
+```python
+PANTALLAS_DEL_EMPLEADO = frozenset({
+    'calendario',
+    'consumo_selector', 'consumo_evento',
+    'movimientostock_create',                        # el POST de cada renglón
+    'movimientostock_update', 'movimientostock_delete',   # corregir lo suyo
+    'merma',
+    'login', 'logout',
+})
+```
+
+**Lo que no está en esa lista, no se ve.** Es la misma decisión que
+`LoginRequiredMiddleware` (una línea cubre las 50 vistas y las que vengan), pero
+con el rol: con lista negra habría que acordarse de bloquear cada pantalla nueva,
+y el olvido se descubriría el día que un mozo abra la rentabilidad de un evento.
+Con lista blanca, la pantalla que nadie nombró **nace cerrada** — que es el
+default que uno quiere cuando se equivoca.
+
+⚠️ Va en `process_view()` y no en `__call__()`: `request.resolver_match` todavía
+es `None` cuando entra el request, y sin él no hay `url_name` que mirar. Y va
+**último** en `MIDDLEWARE`, después de `MessageMiddleware`, porque usa `messages`.
+
+⚠️ `movimientostock_create` está en la lista **a propósito**: es el POST de cada
+renglón de la tabla de consumo. Sin él la pantalla se ve pero el botón "Agregar"
+rebota, que es peor que no tener la pantalla.
+
+⚠️ **La casa del empleado es `/calendario/`, no `home`.** El panel son accesos
+rápidos a pantallas que no puede abrir, así que `home` lo redirige — y lo hace
+**sin mensaje de error**, porque `home` es `LOGIN_REDIRECT_URL` y el empleado cae
+ahí en cada ingreso sin haber tocado nada. Retarlo por eso sería un modal de error
+cada vez que entra a trabajar. El resto de las pantallas sí avisa.
+
+**Ya no hay `SoloAdminMixin`**: dos mecanismos para lo mismo garantizan que algún
+día se contradigan. Para abrirle una pantalla nueva al empleado, se agrega su
+`url_name` a la lista y **nada más**.
+
+Del lado del template, `{% if user.is_staff %}` esconde lo que no le sirve: el
+grupo "Sistema" del sidebar, el link al detalle del evento en el calendario, el
+botón "Nuevo evento", la pestaña "Personal" de Consumo (que carga **pagos**) y los
+botones "Historial" / "Ver detalle" de esa misma pantalla. Esconder links es
+prolijidad; **lo que frena de verdad es el middleware**.
+
+⚠️ El sidebar del empleado es un bloque aparte con sus tres links, no diez
+`{% if %}` intercalados en el del administrador. Son tres links repetidos contra
+un nav ilegible — y de paso el menú del administrador queda intacto.
+
+#### El empleado corrige lo suyo, y "lo suyo" tiene tres candados
+
+Un mozo que se equivoca en una cantidad un sábado a las 3 de la mañana no puede
+quedar esperando al dueño. Pero abrir `movimientostock_update` / `_delete` a
+secas le abría **el libro mayor entero** por URL directa. Los tres límites:
+
+1. **`MovimientoDelEmpleadoMixin`** filtra el queryset: `exclude(tipo='entrada')`.
+   Las compras (reposición de depósito) no son suyas — borrar una de medio millón
+   movía el stock de verdad. Lo que queda afuera da **404**, porque va en el
+   queryset y no en el template: el botón se esconde, la URL no.
+2. **El campo `tipo` va `disabled`** para el empleado. Convertir una salida en
+   entrada sería **inventar mercadería que nunca llegó**. `disabled` además
+   ignora lo que venga por POST, no solo lo pinta gris.
+3. **`volver_del_movimiento()` recibe el usuario.** Un movimiento con evento
+   manda al administrador a `evento_detail` y al empleado a `consumo_evento`:
+   mandarlo al detalle sería rebotarlo al calendario con un cartel de error justo
+   después de haber corregido bien.
+
+⚠️ **`consumo_evento` muestra la tabla "Ya cargado en este evento"** (contexto
+`cargado`, sin las entradas y **sin costos**). No es decoración: el historial y
+el detalle del evento son del administrador, así que sin esa tabla el empleado no
+tenía **desde dónde llegar** al botón de corregir y el permiso era letra muerta.
+
+⚠️ `MovimientoStock` **no guarda quién lo cargó**, así que un empleado puede
+corregir el consumo que cargó otro. Con dos o tres mozos por evento no molesta;
+si algún día molesta, el arreglo es una FK a `User` en el movimiento y filtrar
+por ella en el mismo mixin, no un permiso nuevo.
 
 **El módulo de usuarios**: alta con `UserCreationForm` (la subclase solo agrega
 `is_staff` a `Meta.fields` — las dos contraseñas y sus validadores ya están
@@ -634,6 +720,95 @@ el sistema se opera desde las pantallas propias, no desde el admin.
 ⚠️ Los usuarios son la única tabla del sistema **sin FK que la proteja**: borrar
 uno no arrastra nada (ningún modelo apunta a `User`). Para alguien que se fue pero
 podría volver, la opción buena es destildar "Puede ingresar", no borrar.
+
+### RN-26 · La unidad de medida es un catálogo, no texto libre
+`UnidadMedida` es una tabla con CRUD en `/unidades/`, y `Producto.unidad_medida`
+es una FK. Antes era un `CharField` con `default='unidad'`.
+
+Es la misma decisión que los puestos (RN-21) y por el mismo motivo: el dueño
+quiere agregar "Botellas" o "Docenas" sin esperar un deploy. La migración `0017`
+la siembra con las cuatro que pidió — Cajas, Kilogramos, Litros, Unidad — y de ahí
+en adelante las administra él.
+
+Texto libre garantizaba que el mismo producto se cargara como `kg`, `Kg` y
+`kilos`, y ahí no hay forma de sumar ni de filtrar nada.
+
+⚠️ `on_delete=PROTECT`: la unidad es lo que le da sentido al stock. Borrar "Litros"
+del catálogo dejaría el fernet en **"50"** a secas, que no es un dato, es un
+número. `UnidadMedidaDeleteView` atrapa el `ProtectedError` y avisa cuántos
+productos la usan.
+
+⚠️ La conversión `CharField` → FK va **a mano** en la migración (renombrar la
+columna vieja, crear la nueva, mapear, borrar la vieja). El `AlterField` que
+genera Django solo se lleva puestos los datos. Los valores viejos se normalizan
+con una tabla de alias, y **lo que no reconoce lo crea tal cual**: perder una
+unidad cargada por no reconocerla sería peor que una unidad de más. Mismo criterio
+que la `0010` con los puestos.
+
+⚠️ Los 15 templates que dicen `{{ producto.unidad_medida }}` **no se tocaron**: con
+FK eso sale por `__str__` y se lee igual que antes.
+
+### RN-27 · Al guardar en una tabla con pestañas, se vuelve a esa pestaña
+`views.volver_al_sector()` devuelve el listado de productos con el fragmento del
+sector (`#extras-pane`), y lo usan los **cinco** caminos: alta, edición, borrado,
+baja lógica y reactivación.
+
+Sin eso el listado abría siempre en Barra: tocabas un producto de Extras y al
+guardar aparecías en otra pestaña, buscando de nuevo dónde estabas. Compras y
+Merma ya lo hacían (RN-4); lo que faltaba era Productos.
+
+⚠️ El camino del `ProtectedError` (dar de baja en vez de borrar, RN-20) es **otro
+`return`** dentro de la misma vista. Es el que se olvida, y tiene su propio test.
+
+⚠️ Funciona igual dentro del modal (RN-22): el JS navega al redirect, y el helper
+de pestañas de `base.html` lee el `#hash` al cargar. Los `<sector>-pane` son
+contrato con ese helper.
+
+### RN-28 · El PDF lo hace el navegador, no el servidor
+El botón "Descargar PDF" (`_boton_pdf.html`, en detalle de evento, Productos y
+Eventos) llama a `window.print()`. El navegador ofrece **"Guardar como PDF"** como
+destino de impresión, y el diseño del papel sale del bloque `@media print` de
+`base.html`.
+
+**No hay librería de PDF a propósito.** ReportLab o WeasyPrint son una dependencia
+nueva (y WeasyPrint en Windows arrastra GTK), contra un `@media print` que ya
+soporta cualquier navegador. El costo real es un click más: el usuario elige
+"Guardar como PDF" en el diálogo en vez de bajar un archivo directo.
+
+Lo que hace el CSS de impresión:
+- saca el panel lateral, la barra y todo lo marcado `.no-print`;
+- pasa a **tinta negra sobre blanco** — el tema noir en una hoja son 30 MB de
+  tóner y no se lee;
+- reemplaza las capas de tono por bordes, que es lo único que separa en papel;
+- evita que una tabla se parta entre dos hojas (`break-inside: avoid`);
+- despliega el `overflow-x` de las tablas anchas, que en papel entran enteras;
+- esconde los controles: botones, y los iconos de acción **por `aria-label`**,
+  para no llevarse puestos los links que son texto.
+
+⚠️ El botón es `<button onclick>` y no un `<script>` con listener: los `<script>`
+que entran por `innerHTML` **no se ejecutan** dentro de un modal (RN-22), así que
+un listener no se ataría justo donde más se usa.
+
+⚠️ La columna "Acciones" se marca con `.col-acciones` en el HTML porque **CSS no
+puede seleccionar por el texto de una celda**. Sin eso quedaba una columna vacía
+con su encabezado en el papel.
+
+### RN-29 · El fragmento de modal necesita su propio contenedor
+`_base_modal.html` envuelve el `{% block content %}` en un
+`<div class="flex flex-col gap-stack-lg">`.
+
+En la pantalla suelta, lo que separa una sección de otra es el `<main>` de
+`base.html`. El fragmento no lo tenía, así que las pantallas de varias secciones
+—el detalle de un evento— salían con todo pegado, **y solo dentro del modal**.
+
+⚠️ Relacionado: los breakpoints de Tailwind (`lg:grid-cols-6`) miran el **viewport,
+no el contenedor**. En una ventana grande, el modal es angosto pero los
+breakpoints siguen creyendo que hay lugar: seis columnas aplastadas, y el chip de
+Estado montándose sobre Paquete. Por eso la tira de datos usa `.grid-datos`
+(`auto-fit` + `minmax`), que es CSS puro y mide el ancho **real** disponible.
+
+⚠️ Los comentarios `<!-- -->` viajan al navegador; los de Django `{# #}` no. Para
+notas de implementación va el segundo.
 
 ---
 
@@ -666,6 +841,11 @@ consumo + tabla de personal + cargos + margen.
 administrador lo ve) → `Nuevo usuario` → nombre + contraseña, y tildar
 "Administrador" solo si va a manejar todo. La persona ya puede entrar por
 `/ingresar/`. Si se olvida la clave, el icono 🔑 de la fila se la cambia (RN-25).
+
+**El día del empleado** → ingresa y cae en `/calendario/`, donde ve qué fiesta
+hay y qué día, sin poder abrirla → `/consumo/` → elige el evento → carga lo que
+salió → `/merma/` para lo que se rompió. Su menú tiene esas tres pantallas y
+ninguna más (RN-25).
 
 ---
 
