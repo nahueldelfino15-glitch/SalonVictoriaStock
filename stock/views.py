@@ -78,7 +78,7 @@ def parsear_entero(valor):
     except (TypeError, ValueError):
         return None
 
-# ---------- Roles: quién ve qué (RN-24) ----------
+# ---------- Roles: quién ve qué (RN-25) ----------
 class SoloAdminMixin(UserPassesTestMixin):
     """Cuelga esto de una vista y la ve solo el administrador.
 

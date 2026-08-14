@@ -253,8 +253,6 @@ El panel principal (`home`) y `/calendario/` comparten la misma función
 
 "Próximos eventos" = `fecha >= hoy`, ordenados por fecha, **máximo 10**.
 
----
-
 ### RN-12 · La merma sale del stock pero no es gasto de nadie
 Tercer tipo de `MovimientoStock`: `merma`. Descuenta stock igual que una `salida`,
 pero **nunca lleva evento** y exige `motivo` (rotura / vencimiento / consumo interno
@@ -364,96 +362,6 @@ $15.868.599 en vez de $129.013.
 `Evento.tiene_precio_cargado` es `bool(ingreso_total)`: sin nada cargado la
 pantalla dice "sin precio" y no "$0". `margen_porcentaje` devuelve `None` cuando no
 hay ingreso, en vez de dividir por cero.
-
-### RN-23 · Las tarjetas: quién paga cuánto, y quién come qué
-`TarjetaEvento` es un tipo de invitado dentro del evento: `concepto`, `cantidad`,
-`valor_unitario` y un `menu` opcional. Una misma fiesta de 100 puede ser 80
-tarjetas de adulto a un precio y 20 de menú infantil a otro — por eso son filas y
-no un precio único en el evento.
-
-⚠️ En este modelo `cantidad` son **personas** (no unidades de stock, como en
-`MovimientoStock.cantidad`) y `valor_unitario` es un **ingreso** (no el costo de
-`Producto.precio_unitario`). Los nombres se repiten en el proyecto con sentidos
-opuestos: mirar de qué modelo es antes de sumar.
-
-**La comida se calcula por tarjeta.** `Evento.raciones_por_menu()` arma
-`{menu_id: porciones}` desde las tarjetas, y `copiar_receta_del_menu()` copia los
-platos de cada menú dejándoles las porciones que les tocan en `Plato.porciones`.
-Después `consumo_sugerido` multiplica por **las porciones del plato**, no por los
-asistentes del evento: 80 raciones de un menú y 20 de otro no son 100 de cada uno.
-
-- Dos tarjetas del mismo menú se **suman en un solo bloque** (80 adultos + 10
-  músicos del mismo menú = 90 raciones, no dos recetas iguales una abajo de la otra).
-- Una tarjeta **sin menú** factura pero no pide comida.
-- Un producto que está en los dos menús sale en **una sola línea** de consumo, con
-  el total sumado antes de redondear (RN-19).
-- Guardar o borrar una tarjeta **recopia la receta** del evento. Sin eso, agregar
-  "20 menús infantiles" sumaría la plata pero la comida seguiría calculando 80
-  raciones de adulto, y nadie lo notaría hasta que falte.
-
-⚠️ Si hay tarjetas con menú, **ellas mandan**: un plato del evento sin `porciones`
-(cargado a mano desde el admin) se ignora. Sin esa guarda se sumaba en paralelo,
-100 raciones arriba de las 80 + 20, sin ningún aviso.
-
-⚠️ Recopiar **borra y recrea** los platos del evento, así que sus `pk` cambian cada
-vez que se toca una tarjeta. Es coherente con RN-18 ("copiar reemplaza"), pero pasa
-mucho más seguido que antes: no guardes referencias a un plato de evento.
-
-Retrocompatibilidad: un evento **sin tarjetas** cae a `Evento.menu × asistentes`,
-que es como funcionaba antes y lo que siguen usando los eventos ya cargados.
-
-⚠️ En ese caso los platos se copian con `porciones = None`, NO con el número de
-asistentes del momento. Sellarlo ahí congelaba la cuenta: corregir los asistentes de
-100 a 150 dejaba la receta pidiendo para 100, y un evento cargado con 0 asistentes
-(hay uno real: "Casamiento Nascar") quedaba sugiriendo 0 de todo para siempre. Con
-`None`, `consumo_sugerido` y `Plato.para()` multiplican **en vivo**.
-
-`Evento.tarjetas_vs_asistentes` avisa si las tarjetas no cuadran con los asistentes,
-pero **no bloquea**: en un salón los números bailan hasta último momento y trabar la
-carga sería peor que el aviso.
-
-⚠️ La recopia se dispara por **señal** (`post_save`/`post_delete` de `TarjetaEvento`),
-no sobrescribiendo `save()`/`delete()`. Es la misma trampa que ya se comió este
-proyecto con `MovimientoStock`: `queryset.delete()` NO pasa por `Model.delete()`, así
-que borrar tarjetas en masa desde el admin dejaba la receta con los platos de un
-grupo que ya no existía. Las señales sí se emiten en todos esos caminos.
-
-### RN-24 · Los recordatorios los manda un job, no la app
-`python manage.py recordar_eventos` avisa por mail los eventos que se vienen. Se
-corre **una vez por día desde afuera** (Programador de tareas de Windows, cron, o un
-HTTP call): el comando no sabe ni le importa quién lo dispara, y por eso sirve igual
-si algún día la app se muda a un servidor.
-
-```bash
-python manage.py recordar_eventos --dry-run    # muestra qué mandaría, sin mandar
-python manage.py recordar_eventos --dias 15    # otra anticipación, por esta vez
-python manage.py recordar_eventos --reenviar   # ignora que ya se avisó
-```
-
-`DestinatarioAviso` es una tabla con CRUD en `/destinatarios/`, no un setting: mismo
-criterio que los puestos (RN-21). `activo` corta el aviso sin perder la dirección.
-
-**Es una VENTANA (de hoy a hoy+N), no un día exacto.** Con la fecha justa, si la
-máquina estuvo apagada el día que le tocaba a un evento, ese aviso se perdía para
-siempre y nadie se enteraba. `Evento.aviso_enviado_el` es lo que evita repetir; se
-puede vaciar para que vuelva a salir.
-
-⚠️ El evento se marca como avisado **solo si el mail salió**. Marcarlo antes sería
-peor que fallar: no se reintenta nunca y el aviso se pierde en silencio.
-
-El backend de mail **se elige solo**: si hay `EMAIL_HOST` en el entorno usa SMTP, y
-si no imprime por la terminal. Así una máquina recién clonada arranca sin configurar
-nada y nadie le manda un mail de prueba a un cliente real por accidente. La pantalla
-de `/destinatarios/` avisa cuando está en modo consola.
-
-⚠️ El cuerpo del mail se imprime con `_mostrar()` y no con `stdout.write()` directo:
-la consola de Windows es cp1252 y levanta `UnicodeEncodeError` con lo que no entra.
-Las notas del evento son texto libre — un emoji alcanzaba para tirar abajo el
-`--dry-run` y dejarte sin poder revisar qué se iba a mandar.
-
-⚠️ El día de la semana sale con `django.utils.formats.date_format`, no con
-`strftime('%A')`: el segundo usa el idioma del **sistema operativo** y mandaba
-"Sunday" en un mail que lee gente del salón.
 
 ### RN-18 · La receta se carga en el MENÚ, organizada por platos
 La receta es un árbol de tres niveles:
@@ -589,7 +497,97 @@ suelta sigue andando. Los botones "Cancelar" llevan
 `{% if es_modal %}data-modal-close{% endif %}` — condicional, porque el atributo
 suelto haría `preventDefault()` en la página normal y el link no navegaría.
 
-### RN-24 · Dos roles, y el rol es un booleano que Django ya trae
+### RN-23 · Las tarjetas: quién paga cuánto, y quién come qué
+`TarjetaEvento` es un tipo de invitado dentro del evento: `concepto`, `cantidad`,
+`valor_unitario` y un `menu` opcional. Una misma fiesta de 100 puede ser 80
+tarjetas de adulto a un precio y 20 de menú infantil a otro — por eso son filas y
+no un precio único en el evento.
+
+⚠️ En este modelo `cantidad` son **personas** (no unidades de stock, como en
+`MovimientoStock.cantidad`) y `valor_unitario` es un **ingreso** (no el costo de
+`Producto.precio_unitario`). Los nombres se repiten en el proyecto con sentidos
+opuestos: mirar de qué modelo es antes de sumar.
+
+**La comida se calcula por tarjeta.** `Evento.raciones_por_menu()` arma
+`{menu_id: porciones}` desde las tarjetas, y `copiar_receta_del_menu()` copia los
+platos de cada menú dejándoles las porciones que les tocan en `Plato.porciones`.
+Después `consumo_sugerido` multiplica por **las porciones del plato**, no por los
+asistentes del evento: 80 raciones de un menú y 20 de otro no son 100 de cada uno.
+
+- Dos tarjetas del mismo menú se **suman en un solo bloque** (80 adultos + 10
+  músicos del mismo menú = 90 raciones, no dos recetas iguales una abajo de la otra).
+- Una tarjeta **sin menú** factura pero no pide comida.
+- Un producto que está en los dos menús sale en **una sola línea** de consumo, con
+  el total sumado antes de redondear (RN-19).
+- Guardar o borrar una tarjeta **recopia la receta** del evento. Sin eso, agregar
+  "20 menús infantiles" sumaría la plata pero la comida seguiría calculando 80
+  raciones de adulto, y nadie lo notaría hasta que falte.
+
+⚠️ Si hay tarjetas con menú, **ellas mandan**: un plato del evento sin `porciones`
+(cargado a mano desde el admin) se ignora. Sin esa guarda se sumaba en paralelo,
+100 raciones arriba de las 80 + 20, sin ningún aviso.
+
+⚠️ Recopiar **borra y recrea** los platos del evento, así que sus `pk` cambian cada
+vez que se toca una tarjeta. Es coherente con RN-18 ("copiar reemplaza"), pero pasa
+mucho más seguido que antes: no guardes referencias a un plato de evento.
+
+Retrocompatibilidad: un evento **sin tarjetas** cae a `Evento.menu × asistentes`,
+que es como funcionaba antes y lo que siguen usando los eventos ya cargados.
+
+⚠️ En ese caso los platos se copian con `porciones = None`, NO con el número de
+asistentes del momento. Sellarlo ahí congelaba la cuenta: corregir los asistentes de
+100 a 150 dejaba la receta pidiendo para 100, y un evento cargado con 0 asistentes
+(hay uno real: "Casamiento Nascar") quedaba sugiriendo 0 de todo para siempre. Con
+`None`, `consumo_sugerido` y `Plato.para()` multiplican **en vivo**.
+
+`Evento.tarjetas_vs_asistentes` avisa si las tarjetas no cuadran con los asistentes,
+pero **no bloquea**: en un salón los números bailan hasta último momento y trabar la
+carga sería peor que el aviso.
+
+⚠️ La recopia se dispara por **señal** (`post_save`/`post_delete` de `TarjetaEvento`),
+no sobrescribiendo `save()`/`delete()`. Es la misma trampa que ya se comió este
+proyecto con `MovimientoStock`: `queryset.delete()` NO pasa por `Model.delete()`, así
+que borrar tarjetas en masa desde el admin dejaba la receta con los platos de un
+grupo que ya no existía. Las señales sí se emiten en todos esos caminos.
+
+### RN-24 · Los recordatorios los manda un job, no la app
+`python manage.py recordar_eventos` avisa por mail los eventos que se vienen. Se
+corre **una vez por día desde afuera** (Programador de tareas de Windows, cron, o un
+HTTP call): el comando no sabe ni le importa quién lo dispara, y por eso sirve igual
+si algún día la app se muda a un servidor.
+
+```bash
+python manage.py recordar_eventos --dry-run    # muestra qué mandaría, sin mandar
+python manage.py recordar_eventos --dias 15    # otra anticipación, por esta vez
+python manage.py recordar_eventos --reenviar   # ignora que ya se avisó
+```
+
+`DestinatarioAviso` es una tabla con CRUD en `/destinatarios/`, no un setting: mismo
+criterio que los puestos (RN-21). `activo` corta el aviso sin perder la dirección.
+
+**Es una VENTANA (de hoy a hoy+N), no un día exacto.** Con la fecha justa, si la
+máquina estuvo apagada el día que le tocaba a un evento, ese aviso se perdía para
+siempre y nadie se enteraba. `Evento.aviso_enviado_el` es lo que evita repetir; se
+puede vaciar para que vuelva a salir.
+
+⚠️ El evento se marca como avisado **solo si el mail salió**. Marcarlo antes sería
+peor que fallar: no se reintenta nunca y el aviso se pierde en silencio.
+
+El backend de mail **se elige solo**: si hay `EMAIL_HOST` en el entorno usa SMTP, y
+si no imprime por la terminal. Así una máquina recién clonada arranca sin configurar
+nada y nadie le manda un mail de prueba a un cliente real por accidente. La pantalla
+de `/destinatarios/` avisa cuando está en modo consola.
+
+⚠️ El cuerpo del mail se imprime con `_mostrar()` y no con `stdout.write()` directo:
+la consola de Windows es cp1252 y levanta `UnicodeEncodeError` con lo que no entra.
+Las notas del evento son texto libre — un emoji alcanzaba para tirar abajo el
+`--dry-run` y dejarte sin poder revisar qué se iba a mandar.
+
+⚠️ El día de la semana sale con `django.utils.formats.date_format`, no con
+`strftime('%A')`: el segundo usa el idioma del **sistema operativo** y mandaba
+"Sunday" en un mail que lee gente del salón.
+
+### RN-25 · Dos roles, y el rol es un booleano que Django ya trae
 Hay **administrador** y **empleado**. Nada más, y por eso el rol NO es un modelo
 nuevo ni un `Group`: es `User.is_staff`.
 
@@ -667,7 +665,7 @@ consumo + tabla de personal + cargos + margen.
 **Dar de alta a alguien que va a usar el sistema** → `/usuarios/` (solo el
 administrador lo ve) → `Nuevo usuario` → nombre + contraseña, y tildar
 "Administrador" solo si va a manejar todo. La persona ya puede entrar por
-`/ingresar/`. Si se olvida la clave, el icono 🔑 de la fila se la cambia (RN-24).
+`/ingresar/`. Si se olvida la clave, el icono 🔑 de la fila se la cambia (RN-25).
 
 ---
 

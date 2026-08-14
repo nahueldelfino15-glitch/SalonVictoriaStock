@@ -244,5 +244,5 @@ modales no se coman los mensajes.
 
 ## Dónde está la documentación técnica
 
-En [CLAUDE.md](CLAUDE.md): modelo de datos, las 24 reglas de negocio, las trampas
+En [CLAUDE.md](CLAUDE.md): modelo de datos, las 25 reglas de negocio, las trampas
 conocidas y la deuda técnica pendiente.

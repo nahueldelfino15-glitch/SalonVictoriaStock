@@ -1821,7 +1821,7 @@ class MovimientosSinEventoTests(ClienteLogueadoTests):
 
 
 class UsuariosDelSistemaTests(TestCase):
-    """RN-24: dos roles, y el modulo de usuarios lo ve solo el administrador."""
+    """RN-25: dos roles, y el modulo de usuarios lo ve solo el administrador."""
 
     def setUp(self):
         self.admin = User.objects.create_user('jefe', password='jefe-1234', is_staff=True)

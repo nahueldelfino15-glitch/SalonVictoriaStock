@@ -93,7 +93,7 @@ urlpatterns = [
     path('consumo/', views.consumo_selector, name='consumo_selector'),
     path('consumo/<int:evento_pk>/', views.consumo_evento, name='consumo_evento'),
 
-    # Quién entra al sistema y con qué rol. Solo el administrador (RN-24).
+    # Quién entra al sistema y con qué rol. Solo el administrador (RN-25).
     path('usuarios/', views.UsuarioListView.as_view(), name='usuario_list'),
     path('usuarios/nuevo/', views.UsuarioCreateView.as_view(), name='usuario_create'),
     path('usuarios/<int:pk>/editar/', views.UsuarioUpdateView.as_view(), name='usuario_update'),

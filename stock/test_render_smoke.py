@@ -49,7 +49,7 @@ class RenderSmoke(TestCase):
 
     def setUp(self):
         # Administrador (is_staff): sin eso las pantallas de usuarios redirigen
-        # en vez de renderizar, y el smoke las contaria como rotas (RN-24).
+        # en vez de renderizar, y el smoke las contaria como rotas (RN-25).
         self.usuario = User.objects.create_user('tester', password='x-1234', is_staff=True)
         self.otro_usuario = User.objects.create_user('mozo', password='x-1234')
         self.client.force_login(self.usuario)
