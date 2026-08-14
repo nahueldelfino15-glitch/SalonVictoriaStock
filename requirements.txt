@@ -7,3 +7,8 @@ Django==6.1
 # compiladas: sin eso hace falta un compilador de C y las libs de Postgres
 # instaladas, que en Windows es un dolor de cabeza.
 psycopg[binary]==3.2.3
+
+# Sirve los archivos estaticos desde la misma app. En Vercel no hay un nginx
+# adelante ni disco donde dejarlos, y Django con DEBUG=False no los sirve solo:
+# sin esto el logo del salon da 404 en produccion.
+whitenoise==6.8.2

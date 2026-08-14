@@ -67,6 +67,93 @@ Kilogramos, Litros, Unidad). El resto lo cargás vos desde las pantallas.
 > El `.env` **no se versiona**: tiene la contraseña de la base. Cada uno tiene
 > el suyo apuntando al mismo proyecto de Supabase.
 
+---
+
+## Publicarlo en Vercel (deploys automáticos desde GitHub)
+
+Cada `git push` a `main` republica el sistema solo. Los deploys tardan ~1 minuto.
+
+### 1. Subir el repo a GitHub
+
+Si ya está en GitHub (este lo está), saltealo. Si no:
+
+```bash
+git remote add origin https://github.com/TU-USUARIO/SalonVictoriaStock.git
+git push -u origin main
+```
+
+### 2. Conectar Vercel
+
+1. Entrá a **[vercel.com](https://vercel.com)** e ingresá **con tu cuenta de GitHub**.
+2. **Add New → Project** → elegí el repo `SalonVictoriaStock` → **Import**.
+3. Framework Preset: dejá **Other**. No toques Build Command ni Output Directory:
+   `vercel.json` ya dice todo lo que hace falta.
+4. **Antes de darle Deploy**, abrí *Environment Variables* y cargá estas cuatro:
+
+| Name | Value |
+|------|-------|
+| `DATABASE_URL` | La misma string de Supabase que tenés en tu `.env` |
+| `DJANGO_SECRET_KEY` | Una clave larga y random (abajo dice cómo generarla) |
+| `CRON_SECRET` | Cualquier texto largo inventado, para el aviso diario |
+| `TZ` | `America/Argentina/Buenos_Aires` |
+
+Para la `SECRET_KEY`:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+5. **Deploy**. En un minuto te da la URL: `salon-victoria-stock.vercel.app`.
+
+> No hace falta setear `DJANGO_DEBUG` ni `DJANGO_ALLOWED_HOSTS`: en Vercel se
+> resuelven solos. `DEBUG` arranca en `False` **por diseño**, no por variable —
+> con `DEBUG=True` una página de error le muestra a cualquiera el settings
+> completo, con la contraseña de la base adentro.
+
+### 3. Los deploys automáticos ya están andando
+
+Desde acá, cada push a `main` publica solo. Y cada rama o Pull Request estrena su
+propia URL de preview, que apunta **a la misma base de Supabase** — ojo con eso:
+probar en una preview toca los datos de verdad.
+
+### 4. El recordatorio diario
+
+`vercel.json` ya declara el cron: todos los días a las 11 UTC (8 de la mañana en
+Argentina) Vercel llama a `/avisos/cron/`, que dispara `recordar_eventos` (RN-24).
+
+No hace falta configurar nada más, pero verificá que **`CRON_SECRET` esté cargada**:
+sin ella la URL devuelve 503 y no manda nada. Es a propósito — una URL que le
+manda mails a los clientes no puede quedar abierta porque faltó una variable.
+
+Para probarlo a mano:
+
+```bash
+curl -H "Authorization: Bearer TU_CRON_SECRET" https://tu-app.vercel.app/avisos/cron/
+```
+
+### Lo que tenés que saber de correr en Vercel
+
+- **Cold start.** Si nadie entró en un rato, la primera pantalla tarda 1–3 segundos.
+  Las siguientes van normales. Es así en todo lo serverless.
+- **Timeout de 10 segundos** en el plan gratis. Ninguna pantalla del sistema se
+  acerca, pero si algún día una tarda, el síntoma es un 504.
+- **No hay disco.** Nada que el sistema escriba en un archivo sobrevive al request.
+  Por eso los datos van a Supabase y no a SQLite.
+- **Los logs** están en Vercel → tu proyecto → *Logs*. Ahí aparece cualquier error
+  de producción, porque con `DEBUG=False` el navegador solo muestra "Server Error".
+
+### Si algo falla en el primer deploy
+
+| Síntoma | Qué es |
+|---------|--------|
+| `DisallowedHost` | Falta que Vercel setee `VERCEL=1` (lo hace solo). Revisá que `vercel.json` esté en la raíz |
+| Formularios rebotan con **CSRF** | `CSRF_TRUSTED_ORIGINS` — se arma solo en Vercel; si usás dominio propio, agregalo |
+| `too many clients` en Supabase | Conexiones colgadas. `CONN_MAX_AGE` va en 0 en Vercel, ya está resuelto |
+| El logo no carga | WhiteNoise. Verificá que esté en `requirements.txt` |
+| `ImproperlyConfigured: Falta DATABASE_URL` | No cargaste la variable de entorno en Vercel |
+
+---
+
 ### Si querés ver el sistema con datos antes de cargar los reales
 
 ```bash

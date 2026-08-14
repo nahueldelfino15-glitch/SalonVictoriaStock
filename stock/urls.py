@@ -64,6 +64,10 @@ urlpatterns = [
     path('puestos/<int:pk>/editar/', views.PuestoUpdateView.as_view(), name='puesto_update'),
     path('puestos/<int:pk>/eliminar/', views.PuestoDeleteView.as_view(), name='puesto_delete'),
 
+    # La dispara el cron de Vercel una vez por dia (RN-34). No la abre el login:
+    # la protege el header Authorization contra CRON_SECRET.
+    path('avisos/cron/', views.cron_recordatorios, name='cron_recordatorios'),
+
     path('unidades/', views.UnidadMedidaListView.as_view(), name='unidad_list'),
     path('unidades/nueva/', views.UnidadMedidaCreateView.as_view(), name='unidad_create'),
     path('unidades/<int:pk>/editar/', views.UnidadMedidaUpdateView.as_view(), name='unidad_update'),

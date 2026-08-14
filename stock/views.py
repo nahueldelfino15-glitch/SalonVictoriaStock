@@ -1,13 +1,18 @@
 import calendar
+import io
+import os
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import transaction
+from django.http import JsonResponse
 from django.db.models import ProtectedError
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404, redirect, render
@@ -1300,6 +1305,37 @@ def consumo_evento(request, evento_pk):
         .order_by('-fecha', '-pk')
     )
     return render(request, 'stock/consumo_evento.html', context)
+
+
+@login_not_required
+def cron_recordatorios(request):
+    """Dispara `recordar_eventos` por HTTP, para el cron de Vercel (RN-34).
+
+    RN-24 ya decia que el job se corre "desde afuera" y que al comando no le
+    importa quien lo llama. En una PC eso es el Programador de tareas; en Vercel
+    no hay PC, asi que la unica forma de agendarlo es un HTTP call diario.
+
+    Va sin sesion (`login_not_required`) porque el que llama es Vercel, no una
+    persona: lo que la protege es el secreto, no el login.
+    """
+    esperado = os.environ.get('CRON_SECRET', '')
+
+    # Sin secreto configurado NO se abre igual: una URL que manda mails a los
+    # clientes del salon no puede quedar publica porque falto una variable.
+    if not esperado:
+        return JsonResponse(
+            {'ok': False, 'error': 'Falta CRON_SECRET en el entorno.'}, status=503
+        )
+
+    if request.headers.get('Authorization') != f'Bearer {esperado}':
+        return JsonResponse({'ok': False, 'error': 'No autorizado.'}, status=401)
+
+    # La salida del comando se captura para devolverla en el JSON: en Vercel no
+    # hay terminal donde mirar, y un cron que falla en silencio es peor que uno
+    # que no existe.
+    salida = io.StringIO()
+    call_command('recordar_eventos', stdout=salida, stderr=salida)
+    return JsonResponse({'ok': True, 'detalle': salida.getvalue()})
 
 
 def menu_del_evento(request, evento_pk, menu_pk):

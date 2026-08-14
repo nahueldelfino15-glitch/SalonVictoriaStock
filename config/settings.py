@@ -40,6 +40,10 @@ def cargar_env(ruta):
 
 cargar_env(BASE_DIR / '.env')
 
+# Vercel setea esta variable sola en cada deploy. Se usa para las decisiones que
+# cambian entre "mi maquina" y "una funcion serverless".
+EN_VERCEL = bool(os.environ.get('VERCEL'))
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -52,9 +56,12 @@ SECRET_KEY = os.environ.get(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Sigue en True por defecto para no romper el runserver local: en el servidor
-# definir DJANGO_DEBUG=False.
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
+# En tu maquina arranca en True para no romper el runserver. En Vercel arranca
+# en False SOLO: con DEBUG=True una pagina de error le muestra a cualquiera el
+# settings entero, incluida la contrasenia de la base. Depender de que alguien
+# se acuerde de setear la variable es exactamente el olvido que no se puede
+# permitir.
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False' if EN_VERCEL else 'True').lower() == 'true'
 
 # Hosts permitidos, separados por coma. El default cubre el desarrollo local y
 # el cliente de tests; en el servidor definir DJANGO_ALLOWED_HOSTS.
@@ -71,6 +78,36 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
+if EN_VERCEL:
+    # Cada deploy de Vercel estrena su propia URL (`<proyecto>-<hash>.vercel.app`),
+    # asi que la lista no se puede escribir a mano: habria que tocar una variable
+    # de entorno en cada push y el deploy de preview daria 400 hasta acordarse.
+    ALLOWED_HOSTS.append('.vercel.app')
+    dominio = os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
+    if dominio:
+        ALLOWED_HOSTS.append(dominio)
+
+    # Django 4+ exige el origen completo (con esquema) para aceptar un POST.
+    # Sin esto, entrar se puede... pero cualquier formulario rebota con
+    # "CSRF verification failed" y el sistema queda de solo lectura.
+    CSRF_TRUSTED_ORIGINS = ['https://*.vercel.app']
+    if dominio:
+        CSRF_TRUSTED_ORIGINS.append(f'https://{dominio}')
+
+    # Vercel termina el TLS antes de la funcion, asi que Django ve http y sin
+    # esto marcaria la cookie de sesion como insegura.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+
+    # Un anio de HSTS: el navegador va a HTTPS solo, sin pasar por el redirect.
+    # Se puede porque el dominio es de Vercel y nunca sirvio por HTTP plano; en
+    # un dominio propio con subdominios viejos, esto se prende con cuidado.
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 
 # Application definition
 
@@ -86,6 +123,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Sirve los estaticos sin nginx adelante. Va JUSTO despues de Security y
+    # antes que todo lo demas: un pedido de /static/ se contesta ahi mismo, sin
+    # levantar sesion ni pasar por la autenticacion.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -164,10 +205,16 @@ def base_desde_url(url):
         'HOST': partes.hostname or '',
         'PORT': str(partes.port or 5432),
         'OPTIONS': {'sslmode': 'require', **opciones},
-        # Reusar la conexion 10 minutos: contra una base remota, abrir una por
-        # request agrega el handshake TLS a CADA pantalla.
-        'CONN_MAX_AGE': 600,
-        'CONN_HEALTH_CHECKS': True,
+        # Reusar la conexion contra una base remota evita pagar el handshake TLS
+        # en CADA pantalla.
+        #
+        # ⚠️ En Vercel va en 0 a proposito. Cada request es una funcion que se
+        # apaga al terminar, asi que la conexion "reusada" queda colgada del lado
+        # de Postgres sin que nadie la cierre. Con trafico real eso agota el pool
+        # de Supabase en minutos y la app empieza a tirar "too many clients",
+        # que en local no pasa nunca.
+        'CONN_MAX_AGE': 0 if EN_VERCEL else 600,
+        'CONN_HEALTH_CHECKS': not EN_VERCEL,
         # El pooler en modo transaction no mantiene el cursor entre statements.
         'DISABLE_SERVER_SIDE_CURSORS': partes.port == 6543,
     }
@@ -252,6 +299,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise sirve directo desde stock/static/ en vez de exigir un collectstatic
+# previo. En Vercel el build de Python no lo corre solo, y el proyecto tiene UN
+# archivo estatico (el logo): armar un build step para eso seria mas fragil que
+# el problema que resuelve.
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = DEBUG
 
 
 # Email

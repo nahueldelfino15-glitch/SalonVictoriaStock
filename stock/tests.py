@@ -5,6 +5,7 @@ deberia comportarse el sistema. Los que estan marcados como bug fallan hoy
 a proposito y tienen que pasar cuando se apliquen los arreglos.
 """
 
+import os
 from datetime import date, timedelta
 from decimal import Decimal
 from io import StringIO
@@ -16,6 +17,7 @@ from django.core.management import call_command
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
     CargoEvento,
@@ -2190,6 +2192,71 @@ class UnidadesDeMedidaTests(TestCase):
             unidad_medida=una_unidad('Litros'),
         )
         self.assertEqual(f'{producto.stock_actual:.0f} {producto.unidad_medida}', '5 Litros')
+
+
+class CronDeRecordatoriosTests(TestCase):
+    """RN-34: el job se dispara por HTTP, porque en Vercel no hay PC con cron."""
+
+    def setUp(self):
+        self.url = reverse('stock:cron_recordatorios')
+        DestinatarioAviso.objects.create(nombre='Duenio', email='duenio@salon.com')
+        self.evento = Evento.objects.create(
+            nombre='Boda', fecha=timezone.localdate() + timedelta(days=3),
+            asistentes=100, estado='confirmado',
+        )
+
+    def test_sin_secreto_configurado_no_se_abre_igual(self):
+        """Una URL que manda mails a los clientes no puede quedar publica porque
+        falto una variable de entorno."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('CRON_SECRET', None)
+            respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 503)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_sin_el_header_correcto_rebota(self):
+        with patch.dict(os.environ, {'CRON_SECRET': 'abracadabra'}):
+            respuesta = self.client.get(self.url)
+        self.assertEqual(respuesta.status_code, 401)
+        self.assertEqual(len(mail.outbox), 0, 'no manda nada al que no se identifica')
+
+    def test_con_un_secreto_equivocado_tampoco(self):
+        with patch.dict(os.environ, {'CRON_SECRET': 'abracadabra'}):
+            respuesta = self.client.get(self.url, headers={'Authorization': 'Bearer otro'})
+        self.assertEqual(respuesta.status_code, 401)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_con_el_secreto_correcto_manda_los_avisos(self):
+        with patch.dict(os.environ, {'CRON_SECRET': 'abracadabra'}):
+            respuesta = self.client.get(
+                self.url, headers={'Authorization': 'Bearer abracadabra'}
+            )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta.json()['ok'])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Boda', mail.outbox[0].subject)
+
+    def test_devuelve_lo_que_dijo_el_comando(self):
+        """En Vercel no hay terminal donde mirar: un cron que falla en silencio
+        es peor que uno que no existe."""
+        with patch.dict(os.environ, {'CRON_SECRET': 'abracadabra'}):
+            respuesta = self.client.get(
+                self.url, headers={'Authorization': 'Bearer abracadabra'}
+            )
+        self.assertIn('Avisado', respuesta.json()['detalle'])
+
+    def test_no_pide_sesion(self):
+        """El que llama es Vercel, no una persona: lo que protege es el secreto.
+
+        Sin `login_not_required`, LoginRequiredMiddleware redirige al login y el
+        cron nunca corre — devolviendo 302, que Vercel cuenta como exito.
+        """
+        with patch.dict(os.environ, {'CRON_SECRET': 'abracadabra'}):
+            respuesta = self.client.get(
+                self.url, headers={'Authorization': 'Bearer abracadabra'}
+            )
+        self.assertNotEqual(respuesta.status_code, 302, 'no tiene que ir al login')
 
 
 class ConexionASupabaseTests(TestCase):

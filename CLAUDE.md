@@ -938,6 +938,53 @@ Postgres, se saca ese `if`.
 pasos. Fallar en el arranque con instrucciones es mejor que fallar diez pantallas
 después con un error de psycopg.
 
+### RN-34 · En Vercel corre como función, no como servidor
+`api/index.py` expone la app WSGI y `vercel.json` manda todo ahí. Cada request es
+una función que arranca, contesta y **se apaga**. Eso cambia cuatro cosas, y
+todas se deciden solas con la variable `VERCEL` que Vercel setea en el deploy:
+
+| Setting | En tu máquina | En Vercel | Por qué |
+|---------|---------------|-----------|---------|
+| `DEBUG` | `True` | **`False`** | Con `True`, una página de error muestra el settings entero — con la contraseña de la base adentro |
+| `CONN_MAX_AGE` | `600` | **`0`** | La función se apaga sin cerrar la conexión: quedan colgadas del lado de Postgres hasta agotar el pool |
+| `ALLOWED_HOSTS` | localhost | `.vercel.app` | Cada deploy estrena URL propia; escribirlas a mano sería tocar una variable en cada push |
+| `SECURE_SSL_REDIRECT` y cookies | apagado | prendido | Vercel corta el TLS antes de la función, así que Django ve `http` |
+
+⚠️ **`DEBUG` arranca en `False` solo, no por variable de entorno.** Depender de que
+alguien se acuerde de setearla es exactamente el olvido que no se puede permitir:
+el costo de olvidarlo es publicar la contraseña de la base.
+
+⚠️ **`CSRF_TRUSTED_ORIGINS` no es opcional.** Sin él se puede entrar y navegar,
+pero **todo formulario rebota** con "CSRF verification failed": el sistema queda
+de solo lectura y el error no dice que falta un setting.
+
+⚠️ Los estáticos los sirve **WhiteNoise** con `WHITENOISE_USE_FINDERS = True`, sin
+`collectstatic` previo. Con `DEBUG=False` Django no los sirve y en Vercel no hay
+nginx adelante ni disco donde dejarlos. Es UN archivo (el logo): armarle un build
+step sería más frágil que el problema que resuelve.
+
+#### El recordatorio diario, sin PC que lo dispare
+RN-24 ya decía que `recordar_eventos` se corre "desde afuera" y que al comando no
+le importa quién lo llama — ahí decía Programador de tareas de Windows o un
+**HTTP call**. En Vercel no hay PC, así que es el HTTP call: `vercel.json` declara
+un cron diario contra `/avisos/cron/`.
+
+⚠️ Esa vista va con `@login_not_required` porque el que llama es Vercel, no una
+persona. **Lo que la protege es `CRON_SECRET`**, contra el header `Authorization`.
+Sin esa marca, `LoginRequiredMiddleware` la redirige al login, el cron nunca corre
+— y devuelve 302, que Vercel cuenta como éxito. Falla en silencio para siempre.
+
+⚠️ **Sin `CRON_SECRET` configurado devuelve 503, no se abre igual.** Una URL que le
+manda mails a los clientes del salón no puede quedar pública porque faltó una
+variable de entorno.
+
+⚠️ La salida del comando vuelve en el JSON: en Vercel no hay terminal donde mirar,
+y un cron que falla callado es peor que uno que no existe.
+
+⚠️ El plan gratis de Vercel permite **un disparo por día** por cron. Alcanza justo,
+porque RN-24 trabaja con una VENTANA de días y no con la fecha exacta: si un día
+falla, el aviso sale en la corrida siguiente.
+
 ---
 
 ## 5. Flujos de usuario
