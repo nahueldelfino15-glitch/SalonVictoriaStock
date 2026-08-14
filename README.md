@@ -95,7 +95,11 @@ git push -u origin main
 | `DATABASE_URL` | La misma string de Supabase que tenés en tu `.env` |
 | `DJANGO_SECRET_KEY` | Una clave larga y random (abajo dice cómo generarla) |
 | `CRON_SECRET` | Cualquier texto largo inventado, para el aviso diario |
-| `TZ` | `America/Argentina/Buenos_Aires` |
+
+> **No pongas `TZ`.** Vercel la tiene reservada y te la va a rechazar — pero además
+> no hace falta: con `USE_TZ = True`, Django guarda en UTC y convierte al mostrar
+> usando su propio `TIME_ZONE`, que ya está fijo en `settings.py`. La zona horaria
+> del sistema operativo no la mira nunca.
 
 Para la `SECRET_KEY`:
 

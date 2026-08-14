@@ -985,6 +985,15 @@ y un cron que falla callado es peor que uno que no existe.
 porque RN-24 trabaja con una VENTANA de días y no con la fecha exacta: si un día
 falla, el aviso sale en la corrida siguiente.
 
+⚠️ El `schedule` del cron va en **UTC**: `0 11 * * *` son las 8 de la mañana en
+Argentina. No hay setting que lo traduzca — Vercel lee el cron en UTC y punto.
+
+⚠️ **`TZ` no se configura en Vercel**: es un nombre de variable reservado y lo
+rechaza. Tampoco hace falta. Con `USE_TZ = True` Django guarda en UTC y convierte
+al mostrar con su propio `TIME_ZONE`; la zona horaria del sistema operativo no la
+mira nunca. Las tres variables que sí van son `DATABASE_URL`, `DJANGO_SECRET_KEY`
+y `CRON_SECRET`.
+
 ---
 
 ## 5. Flujos de usuario
