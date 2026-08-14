@@ -1,1 +1,9 @@
+# Dependencias directas. Las transitivas las resuelve pip.
+# Requiere Python 3.12+.
+
 Django==6.1
+
+# El driver de Postgres, para Supabase. El extra [binary] trae las ruedas ya
+# compiladas: sin eso hace falta un compilador de C y las libs de Postgres
+# instaladas, que en Windows es un dolor de cabeza.
+psycopg[binary]==3.2.3

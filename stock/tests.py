@@ -2192,6 +2192,75 @@ class UnidadesDeMedidaTests(TestCase):
         self.assertEqual(f'{producto.stock_actual:.0f} {producto.unidad_medida}', '5 Litros')
 
 
+class ConexionASupabaseTests(TestCase):
+    """La connection string de Supabase -> el dict de DATABASES (RN-33)."""
+
+    def parsear(self, url):
+        from config.settings import base_desde_url
+        return base_desde_url(url)
+
+    def test_lee_una_connection_string_del_session_pooler(self):
+        config = self.parsear(
+            'postgresql://postgres.abcdefghijklm:secreta@'
+            'aws-0-sa-east-1.pooler.supabase.com:5432/postgres'
+        )
+        self.assertEqual(config['ENGINE'], 'django.db.backends.postgresql')
+        self.assertEqual(config['USER'], 'postgres.abcdefghijklm')
+        self.assertEqual(config['PASSWORD'], 'secreta')
+        self.assertEqual(config['HOST'], 'aws-0-sa-east-1.pooler.supabase.com')
+        self.assertEqual(config['PORT'], '5432')
+        self.assertEqual(config['NAME'], 'postgres')
+
+    def test_la_conexion_siempre_va_cifrada(self):
+        config = self.parsear('postgresql://u:c@host:5432/postgres')
+        self.assertEqual(config['OPTIONS']['sslmode'], 'require')
+
+    def test_una_password_con_caracteres_raros_se_desescapa(self):
+        """Supabase genera claves con simbolos, y en una URL van escapados.
+
+        Sin unquote, la clave llega con el %40 literal y el server rechaza la
+        conexion con "password authentication failed", que manda a buscar el
+        problema al lado equivocado.
+        """
+        config = self.parsear('postgresql://u:Cl4ve%40rara%2Fbis@host:5432/postgres')
+        self.assertEqual(config['PASSWORD'], 'Cl4ve@rara/bis')
+
+    def test_el_pooler_en_modo_transaction_apaga_los_prepared_statements(self):
+        """El puerto 6543 no los soporta y psycopg3 los usa por default: sin
+        esto revienta con "prepared statement already exists" en el segundo
+        request, no en el primero, que es lo que lo hace dificil de encontrar."""
+        config = self.parsear('postgresql://u:c@host:6543/postgres')
+        self.assertIsNone(config['OPTIONS']['prepare_threshold'])
+        self.assertTrue(config['DISABLE_SERVER_SIDE_CURSORS'])
+
+    def test_el_session_pooler_los_deja_como_estan(self):
+        config = self.parsear('postgresql://u:c@host:5432/postgres')
+        self.assertNotIn('prepare_threshold', config['OPTIONS'])
+        self.assertFalse(config['DISABLE_SERVER_SIDE_CURSORS'])
+
+    def test_reusa_la_conexion_entre_requests(self):
+        """Contra una base remota, abrir una conexion por request agrega el
+        handshake TLS a cada pantalla."""
+        self.assertEqual(self.parsear('postgresql://u:c@host:5432/postgres')['CONN_MAX_AGE'], 600)
+
+    def test_el_env_no_pisa_lo_que_ya_esta_en_el_entorno(self):
+        """El servidor de verdad manda sobre un .env olvidado en el disco."""
+        import os
+        from config.settings import cargar_env
+        from pathlib import Path
+        import tempfile
+
+        os.environ['VICTORIA_PRUEBA'] = 'del-entorno'
+        try:
+            with tempfile.TemporaryDirectory() as carpeta:
+                archivo = Path(carpeta) / '.env'
+                archivo.write_text('VICTORIA_PRUEBA=del-archivo\n', encoding='utf-8')
+                cargar_env(archivo)
+            self.assertEqual(os.environ['VICTORIA_PRUEBA'], 'del-entorno')
+        finally:
+            del os.environ['VICTORIA_PRUEBA']
+
+
 class CierrePorConteoTests(TestCase):
     """RN-30: se carga lo que QUEDO y el sistema calcula lo que salio."""
 

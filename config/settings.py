@@ -11,10 +11,34 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def cargar_env(ruta):
+    """Mete el .env en os.environ, sin librerias.
+
+    python-dotenv haria esto mismo, pero es una dependencia entera para leer
+    KEY=valor. Lo que ya viene seteado en el entorno GANA: asi el servidor de
+    verdad no lo pisa un .env que quedo olvidado en el disco.
+    """
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding='utf-8').splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith('#') or '=' not in linea:
+            continue
+        clave, _, valor = linea.partition('=')
+        os.environ.setdefault(clave.strip(), valor.strip().strip('"').strip("'"))
+
+
+cargar_env(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -103,12 +127,78 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Los datos viven en Supabase (Postgres). La conexion entra por DATABASE_URL,
+# que trae la contrasenia adentro y por eso NUNCA va al repo: se define en el
+# archivo .env, que esta en .gitignore. En .env.example esta el formato.
+#
+# Sacar la string de: Supabase -> Project Settings -> Database -> Connection string
+#
+# ⚠️ Usar la del **Session pooler** (aws-0-<region>.pooler.supabase.com:5432).
+#    La "Direct connection" (db.<ref>.supabase.co:5432) es IPv6 y la mayoria de
+#    las conexiones hogarenias argentinas no tienen IPv6: da "network unreachable"
+#    y parece que la contrasenia esta mal.
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+
+def base_desde_url(url):
+    """postgresql://usuario:clave@host:puerto/base -> el dict de DATABASES.
+
+    dj-database-url hace esto mismo, pero es otra dependencia para parsear una
+    URL que urllib ya sabe leer.
+    """
+    partes = urlparse(url)
+    opciones = {}
+
+    # El pooler de Supabase en modo transaction (puerto 6543) no soporta
+    # prepared statements, que psycopg3 usa por default: sin esto tira
+    # "prepared statement already exists" ni bien hay dos requests seguidos.
+    if partes.port == 6543:
+        opciones['prepare_threshold'] = None
+
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': (partes.path or '/postgres').lstrip('/'),
+        'USER': unquote(partes.username or ''),
+        'PASSWORD': unquote(partes.password or ''),
+        'HOST': partes.hostname or '',
+        'PORT': str(partes.port or 5432),
+        'OPTIONS': {'sslmode': 'require', **opciones},
+        # Reusar la conexion 10 minutos: contra una base remota, abrir una por
+        # request agrega el handshake TLS a CADA pantalla.
+        'CONN_MAX_AGE': 600,
+        'CONN_HEALTH_CHECKS': True,
+        # El pooler en modo transaction no mantiene el cursor entre statements.
+        'DISABLE_SERVER_SIDE_CURSORS': partes.port == 6543,
     }
-}
+
+
+CORRIENDO_TESTS = 'test' in sys.argv
+
+if CORRIENDO_TESTS:
+    # Los 230 tests corren en SQLite en memoria, no contra Supabase.
+    #
+    # Los datos del sistema viven SOLO en Supabase — esto es la suite, que crea
+    # y destruye su propia base en cada corrida. Contra una base remota eso son
+    # ~20 minutos en vez de 2, y unos tests que tardan 20 minutos no los corre
+    # nadie: la red de seguridad se pierde por lentitud, no por decision.
+    #
+    # Si algun dia hay que probar algo especifico de Postgres, se saca este if.
+    DATABASES = {
+        'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}
+    }
+elif DATABASE_URL:
+    DATABASES = {'default': base_desde_url(DATABASE_URL)}
+else:
+    # Sin DATABASE_URL no hay a donde conectarse. Se falla acá, con el mensaje
+    # de qué hacer, y no diez pantallas más adelante con un error de psycopg.
+    raise ImproperlyConfigured(
+        'Falta DATABASE_URL: la app guarda todo en Supabase.\n\n'
+        '  1. Entra a supabase.com y crea un proyecto (es gratis).\n'
+        '  2. Project Settings -> Database -> Connection string -> Session pooler.\n'
+        '  3. Copia .env.example a .env y pega ahi la string.\n\n'
+        'Los pasos completos estan en el README.'
+    )
 
 
 # Password validation

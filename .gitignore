@@ -1,10 +1,15 @@
-﻿venv/
+venv/
 .venv/
 __pycache__/
 *.pyc
+
+# Tiene la connection string de Supabase, con la contrasenia adentro.
 .env
 
-# Backups de la base. db.sqlite3 sigue versionado a proposito: es el metodo de
-# sincronizacion actual del proyecto. Sacarlo del repo es una decision aparte.
+# La base ya no se versiona: los datos viven en Supabase (una sola base para
+# todos). Antes db.sqlite3 estaba EN el repo y era el metodo de sincronizacion,
+# lo que traia un conflicto binario irresoluble cada vez que dos personas
+# cargaban datos.
+db.sqlite3
 db.sqlite3.backup-*
 *.sqlite3-journal

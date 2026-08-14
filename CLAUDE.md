@@ -10,7 +10,7 @@ personal, compras y consumo. Django monolítico, sin API, sin JS de framework.
 | Item | Valor |
 |------|-------|
 | Framework | Django 6.1 |
-| Base de datos | SQLite (`db.sqlite3` versionado en el repo) |
+| Base de datos | **Supabase (Postgres)** por `DATABASE_URL`. Ver RN-33 |
 | Frontend | Templates Django + **Tailwind CSS (CDN)** + JS vanilla en `base.html` |
 | Diseño | **Noir Luxury** — dark mode, negro en capas + dorado |
 | Fuentes | Hanken Grotesk + Material Symbols Outlined, Google Fonts |
@@ -890,6 +890,54 @@ de escala no aparece a escala cero.
 ⚠️ El detalle de evento no escala con la cantidad de eventos sino con el contenido
 **de ese** evento, así que sus 72 consultas no crecen con el uso del sistema.
 
+⚠️ **Contra Supabase esto pasó de higiene a requisito.** Con SQLite una consulta
+de más costaba microsegundos; contra una base remota cuesta un viaje de red
+(~40-80 ms desde Argentina). Las 159 consultas que tenía el detalle del evento
+serían **10 segundos** de pantalla en blanco. Antes de agregar una propiedad que
+consulte dentro de un `for` de template, mirá RN-32.
+
+### RN-33 · Los datos viven en Supabase, no en el repo
+`DATABASE_URL` (Postgres de Supabase) es la única base. `db.sqlite3` **salió del
+repo** y está en `.gitignore`.
+
+Antes la base viajaba versionada, y esa era la forma de sincronizar el proyecto.
+Funcionaba con una sola persona. Con dos, cada `git pull` era un conflicto
+binario que git **no sabe mergear**: ganaba una base o la otra, y el trabajo del
+otro se perdía entero. Pasó de verdad, más de una vez.
+
+La conexión se arma en `config.settings.base_desde_url()`, que parsea la URL con
+`urllib` en vez de traer `dj-database-url`, y el `.env` lo lee `cargar_env()` en
+vez de `python-dotenv`. Son dos dependencias evitadas por quince líneas.
+
+⚠️ **Va la string del Session pooler, NO la "Direct connection".** La directa
+(`db.<ref>.supabase.co`) resuelve solo por **IPv6**, y la mayoría de las
+conexiones hogareñas argentinas no lo tienen: falla con `network is unreachable`,
+que se lee como si la contraseña estuviera mal y manda a buscar el problema al
+lado equivocado. La del pooler va por IPv4.
+
+⚠️ **El pooler en modo transaction (puerto 6543) no soporta prepared statements**,
+y psycopg3 los usa por default. `base_desde_url()` los apaga solo cuando ve ese
+puerto. Sin eso el primer request anda y el segundo tira "prepared statement
+already exists", que es de los errores más difíciles de rastrear: falla salteado.
+
+⚠️ `CONN_MAX_AGE = 600`: contra una base remota, abrir una conexión por request
+agrega el handshake TLS a **cada** pantalla.
+
+⚠️ **La contraseña se desescapa con `unquote()`.** Supabase genera claves con
+símbolos, y en una URL van percent-encoded. Sin eso llega el `%40` literal y el
+servidor rechaza con "password authentication failed".
+
+⚠️ **Los tests corren en SQLite en memoria** (`if CORRIENDO_TESTS` en settings).
+No es una excepción a "una sola base": los datos del sistema están solo en
+Supabase. Es que 237 tests contra una base remota son ~20 minutos en vez de 2, y
+una suite que tarda 20 minutos no la corre nadie — se pierde la red de seguridad
+por lentitud, no por decisión. Si algún día hay que probar algo específico de
+Postgres, se saca ese `if`.
+
+⚠️ Sin `DATABASE_URL` la app **no arranca**: tira `ImproperlyConfigured` con los
+pasos. Fallar en el arranque con instrucciones es mejor que fallar diez pantallas
+después con un error de psycopg.
+
 ---
 
 ## 5. Flujos de usuario
@@ -1072,9 +1120,9 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
 
 ### 🟢 Menores
 
-8. `db.sqlite3` está versionado en git, **a propósito**: hoy es el método de
-   sincronización del proyecto. Sacarlo es una decisión aparte, no un descuido.
-   El backup `db.sqlite3.backup-*` sí está ignorado.
+8. ~~`db.sqlite3` está versionado en git~~ — **resuelto**: los datos se mudaron a
+   Supabase y la base salió del repo (RN-33). Era la causa del conflicto binario
+   en cada `git pull` con dos personas trabajando.
 9. La migración `0002` eliminó `Evento.hora_inicio`: los eventos manejan fecha, no hora.
 10. **El modal remoto gasta un request de más al guardar.** El fetch sigue el
     redirect para saber a dónde ir, y después el browser navega ahí de nuevo. Se
@@ -1108,8 +1156,14 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
 
 ## 8. Al trabajar en este proyecto
 
-- **No agregues dependencias.** Tailwind por CDN y Django puro alcanzan. En especial:
-  **no metas Node, ni un build step, ni `django-tailwind`, ni `django-compressor`**.
+- **La base es Supabase y hace falta `.env`** (RN-33). Sin `DATABASE_URL` la app
+  no arranca, a propósito. `db.sqlite3` ya no existe en el repo; si ves uno en tu
+  disco es tuyo y está ignorado.
+- **No agregues dependencias.** Tailwind por CDN y Django puro alcanzan. Las dos
+  únicas son `Django` y `psycopg[binary]` (el driver de Postgres, inevitable).
+  En especial: **no metas Node, ni un build step, ni `django-tailwind`, ni
+  `django-compressor`, ni `dj-database-url`, ni `python-dotenv`** — los dos
+  últimos ya están resueltos en quince líneas de `settings.py`.
   El CDN tiene un costo real (no purga clases sin usar), y es un costo que este
   proyecto puede pagar: es una app interna de un solo salón.
 - **No crees `forms.py`** salvo que la validación no entre en `Model.clean()`.

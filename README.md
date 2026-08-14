@@ -3,66 +3,84 @@
 Sistema interno de gestión para un salón de eventos: stock por sector, eventos,
 personal, compras, consumo y rentabilidad.
 
-Django 6.1 + SQLite + Tailwind por CDN. Sin Node, sin build step, sin API.
+Django 6.1 + **Supabase (Postgres)** + Tailwind por CDN. Sin Node, sin build step, sin API.
 
 ---
 
-## Arrancarlo (5 minutos)
+## Arrancarlo
 
-Necesitás **Python 3.12 o superior**. Nada más.
+Necesitás **Python 3.12 o superior** y una cuenta de Supabase (gratis).
+
+**Los datos viven en Supabase, no en tu máquina.** Lo que cargás vos lo ve el
+otro al instante: no hay archivo de base que copiar ni que mergear.
+
+### 1. Crear el proyecto en Supabase (una sola vez, 3 minutos)
+
+1. Entrá a **[supabase.com](https://supabase.com)** → *New project*.
+2. Ponele nombre (`salon-victoria`), elegí una contraseña para la base y la
+   región **South America (São Paulo)** — es la más cerca, y cada milisegundo
+   de latencia se paga en cada pantalla.
+3. Esperá el minuto y medio que tarda en levantar.
+4. Andá a **Project Settings → Database → Connection string** y copiá la del
+   **Session pooler**.
+
+> ⚠️ **Copiá la del Session pooler, NO la "Direct connection".**
+> La directa (`db.<algo>.supabase.co`) es **IPv6**, y la mayoría de las
+> conexiones hogareñas argentinas no tienen IPv6: falla con
+> `network is unreachable` y parece que erraste la contraseña. La del pooler
+> (`aws-0-....pooler.supabase.com`) anda por IPv4.
+
+> ⚠️ Si la contraseña tiene `@`, `/`, `:` o `?`, hay que escaparla en la URL.
+> Lo más simple es generar una sin símbolos raros desde el panel.
+
+### 2. Levantar la app
 
 ```bash
-# 1. Entorno virtual
+# Entorno virtual
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1     # Windows PowerShell
 # source .venv/bin/activate      # Linux / Mac
 
-# 2. Dependencias (es una sola: Django)
+# Dependencias (Django y el driver de Postgres)
 pip install -r requirements.txt
 
-# 3. Base de datos
+# Configuración: copiá el ejemplo y pegá tu connection string
+cp .env.example .env             # en Windows: copy .env.example .env
+#   ...y editá .env con la string del paso 1
+
+# Crear las tablas en Supabase
 python manage.py migrate
 
-# 4. Levantarlo
+# Tu usuario administrador
+python manage.py createsuperuser
+
+# Levantarlo
 python manage.py runserver
 ```
 
 Y entrá a **http://127.0.0.1:8000/**
 
-La base (`db.sqlite3`) viene versionada **con dos meses de uso adentro**: 60
-productos, 22 eventos (13 ya finalizados), 4 menús con receta completa, 16
-empleados y 663 movimientos de stock. No hace falta cargar nada para ver el
-sistema funcionando con volumen.
+El `migrate` deja los catálogos ya cargados: los siete puestos (Mozo, Barman,
+Cocina, Dj, Limpieza, Seguridad, Otro) y las cuatro unidades de medida (Cajas,
+Kilogramos, Litros, Unidad). El resto lo cargás vos desde las pantallas.
 
-Son datos inventados, generados con:
+> El `.env` **no se versiona**: tiene la contraseña de la base. Cada uno tiene
+> el suyo apuntando al mismo proyecto de Supabase.
+
+### Si querés ver el sistema con datos antes de cargar los reales
 
 ```bash
 python manage.py poblar_demo              # muestra qué haría
-python manage.py poblar_demo --confirmar  # BORRA todo y lo regenera
+python manage.py poblar_demo --confirmar  # BORRA TODO y genera 2 meses de uso
 ```
 
-⚠️ `--confirmar` **borra todos los datos** (menos los usuarios). Usa una semilla
-fija, así que dos corridas dan exactamente lo mismo. Cuando el salón empiece a
-cargar datos de verdad, ese comando no se toca más.
+Genera 60 productos, 22 eventos, 4 menús con receta, 16 empleados y 663
+movimientos, todo coherente entre sí (el libro mayor cierra). Usa semilla fija:
+dos corridas dan exactamente lo mismo.
 
-> ⚠️ **Si ya tenías el repo de antes y hacés `git pull`**: `db.sqlite3` está versionado,
-> es binario y **git no lo sabe mergear**. Si le cargaste datos, el pull va a dar
-> conflicto. La salida rápida es quedarte con la del repo:
-> ```bash
-> git checkout --theirs db.sqlite3 && git add db.sqlite3
-> ```
-> Si querés conservar lo tuyo, copiala antes con otro nombre. No hay migración que
-> valga: son dos bases distintas.
-
-### Para entrar
-
-El sistema **pide usuario**: todas las pantallas están detrás del login.
-
-Hay un usuario `Admin` cargado. Si no sabés la contraseña, creá el tuyo:
-
-```bash
-python manage.py createsuperuser
-```
+⚠️ **`--confirmar` borra todos los datos de la base a la que estés apuntando.**
+Si ya tenés `.env` con Supabase, borra los de Supabase. Una vez que el salón
+empiece a cargar datos de verdad, ese comando no se toca más.
 
 ---
 
@@ -282,10 +300,15 @@ No está corrido a propósito. En una base real conviene contar el depósito ant
 python manage.py test stock
 ```
 
-Son **230** y tienen que pasar todos. Cubren la aritmética del stock, la validación
+Son **237** y tienen que pasar todos. Cubren la aritmética del stock, la validación
 de faltantes, la merma, el congelamiento de costos, el margen, las recetas por plato,
-el catálogo de puestos, las tarjetas, los recordatorios por mail y que los
-modales no se coman los mensajes.
+el catálogo de puestos, las tarjetas, el cierre por conteo, los recordatorios por
+mail y que los modales no se coman los mensajes.
+
+**Los tests corren en SQLite en memoria, no contra Supabase** — tardan 2 minutos
+en vez de 20, y no necesitan internet. Los datos del sistema viven solo en
+Supabase; esto es la suite, que arma y tira su propia base en cada corrida.
+Está en `config/settings.py`, en el `if CORRIENDO_TESTS`.
 
 ## Dónde está la documentación técnica
 
