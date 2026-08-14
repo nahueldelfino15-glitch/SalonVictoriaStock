@@ -29,8 +29,21 @@ python manage.py runserver
 
 Y entrá a **http://127.0.0.1:8000/**
 
-La base (`db.sqlite3`) viene versionada con datos de prueba adentro, así que no
-hace falta cargar nada para empezar a mirar.
+La base (`db.sqlite3`) viene versionada **con dos meses de uso adentro**: 60
+productos, 22 eventos (13 ya finalizados), 4 menús con receta completa, 16
+empleados y 663 movimientos de stock. No hace falta cargar nada para ver el
+sistema funcionando con volumen.
+
+Son datos inventados, generados con:
+
+```bash
+python manage.py poblar_demo              # muestra qué haría
+python manage.py poblar_demo --confirmar  # BORRA todo y lo regenera
+```
+
+⚠️ `--confirmar` **borra todos los datos** (menos los usuarios). Usa una semilla
+fija, así que dos corridas dan exactamente lo mismo. Cuando el salón empiece a
+cargar datos de verdad, ese comando no se toca más.
 
 > ⚠️ **Si ya tenías el repo de antes y hacés `git pull`**: `db.sqlite3` está versionado,
 > es binario y **git no lo sabe mergear**. Si le cargaste datos, el pull va a dar
@@ -245,8 +258,9 @@ Para que no lo reportes como bug:
 - **El pago del personal se carga a mano.** Las horas trabajadas son informativas, no calculan nada.
 - **El mismo empleado se puede cargar dos veces en el mismo evento** y se duplica el pago.
 - **La fecha de un movimiento no se puede editar** (queda la de cuando lo cargaste).
-- De los 3 eventos de prueba, solo el de 15 años factura algo (su paquete, $129.013).
-  Los otros dos muestran "sin precio" hasta que les cargues las tarjetas.
+- Los datos de la base son **inventados**: los clientes no existen y los precios son
+  aproximados. Sirven para ver el sistema con volumen, no para sacar conclusiones
+  de negocio.
 
 ## Un tema pendiente de la base de prueba
 

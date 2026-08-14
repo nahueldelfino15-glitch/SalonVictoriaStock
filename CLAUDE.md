@@ -51,6 +51,7 @@ stock/
   management/commands/
     reconciliar_stock.py  # cierra el libro mayor con el stock declarado
     recordar_eventos.py   # el job que avisa por mail (RN-24)
+    poblar_demo.py        # dos meses de uso inventado, con semilla fija
   context_processors.py # resuelve `base_template`: página completa o fragmento de modal
   templates/stock/ # 50 templates
     base.html      # tokens Tailwind + sidebar + helpers JS (tabs, modales, modal remoto)
@@ -868,6 +869,27 @@ recalcula solo (misma razón que RN-23).
 ⚠️ Un producto que está en dos platos del mismo menú sale en **una línea**, con las
 porciones sumadas antes de redondear (RN-19).
 
+### RN-32 · Los listados traen sus relaciones, o son N+1
+Cada `Producto` imprime su `unidad_medida` (FK desde RN-26) y cada `Evento` de un
+listado calcula su margen, que recorre movimientos, personal, tarjetas y cargos.
+Sin `select_related` / `prefetch_related` eso es **una consulta por fila**.
+
+Medido con dos meses de datos (60 productos, 22 eventos, 663 movimientos):
+
+| Pantalla | Antes | Después |
+|----------|------:|--------:|
+| Productos / Compras / Merma | 68 | 8 |
+| Movimientos | 56 | 6 |
+| Eventos | 57 | 16 |
+| Detalle de evento | 159 | 72 |
+
+⚠️ **Con los datos de prueba viejos esto no se veía**: con 5 productos, 5 consultas
+de más no las nota nadie. Es la razón por la que existe `poblar_demo` — un problema
+de escala no aparece a escala cero.
+
+⚠️ El detalle de evento no escala con la cantidad de eventos sino con el contenido
+**de ese** evento, así que sus 72 consultas no crecen con el uso del sistema.
+
 ---
 
 ## 5. Flujos de usuario
@@ -1001,13 +1023,14 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
 
 ### 🔴 Abiertos / importantes
 
-1. **El libro mayor no cierra con `stock_actual`** — divergencia medida de **36
-   unidades** sobre los 5 productos, y en 3 de ellos la suma de movimientos da
-   **negativo** (hay salidas de mercadería que nunca entró). Causa: durante meses
-   `stock_actual` fue editable a mano, así que la carga inicial nunca generó el
-   movimiento que la respalda. Desde la Fase 1 ese agujero está cerrado.
+1. ~~**El libro mayor no cierra con `stock_actual`**~~ — **resuelto de hecho**: la
+   base se regeneró con `poblar_demo`, y ahí todo el stock entró por
+   `MovimientoStock`, así que la suma cierra. `reconciliar_stock` lo confirma
+   ("no hay nada que ajustar").
 
-   La herramienta ya está hecha y probada, **falta ejecutarla**:
+   La divergencia de 36 unidades venía de cuando `stock_actual` era editable a
+   mano; ese agujero está cerrado desde RN-14. **La herramienta sigue estando**,
+   porque el día que el depósito real no coincida con el sistema hace falta:
    ```bash
    python manage.py reconciliar_stock              # diagnóstico, no escribe
    python manage.py reconciliar_stock --confirmar  # escribe los asientos

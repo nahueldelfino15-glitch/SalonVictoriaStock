@@ -103,7 +103,13 @@ class ProductoListView(ListView):
         q = self.request.GET.get('q', '')
         ver_bajas = bool(self.request.GET.get('bajas'))
 
-        productos = Producto.objects.filter(nombre__icontains=q, activo=not ver_bajas)
+        # select_related: cada fila imprime {{ producto.unidad_medida }}, que
+        # desde RN-26 es una FK. Sin esto son 60 consultas para 60 productos.
+        productos = (
+            Producto.objects
+            .filter(nombre__icontains=q, activo=not ver_bajas)
+            .select_related('unidad_medida')
+        )
         context['sectores'] = []
         for clave, etiqueta in SECTOR_CHOICES:
             del_sector = productos.filter(sector=clave).order_by(Lower('nombre'))
@@ -251,7 +257,14 @@ class EventoListView(ListView):
     ordering = ['fecha']
 
     def get_queryset(self):
-        queryset = super().get_queryset().exclude(estado='finalizado')
+        # El listado muestra el margen de cada fila, y eso recorre movimientos,
+        # personal, tarjetas y cargos: sin prefetch son cuatro consultas POR
+        # EVENTO. Con 22 eventos ya son 57; con los de un año, mil.
+        queryset = (
+            super().get_queryset()
+            .exclude(estado='finalizado')
+            .prefetch_related('movimientos__producto', 'personal', 'tarjetas', 'cargos')
+        )
         q = self.request.GET.get('q')
         if q:
             queryset = queryset.filter(nombre__icontains=q)
@@ -268,7 +281,13 @@ class EventoHistorialListView(ListView):
     context_object_name = 'eventos'
 
     def get_queryset(self):
-        queryset = Evento.objects.filter(estado='finalizado').order_by('-fecha')
+        # Mismo motivo que en evento_list: cada fila calcula su margen.
+        queryset = (
+            Evento.objects
+            .filter(estado='finalizado')
+            .prefetch_related('movimientos__producto', 'personal', 'tarjetas', 'cargos')
+            .order_by('-fecha')
+        )
         q = self.request.GET.get('q')
         if q:
             queryset = queryset.filter(nombre__icontains=q)
@@ -282,6 +301,20 @@ class EventoHistorialListView(ListView):
 class EventoDetailView(DetailView):
     model = Evento
     template_name = 'stock/evento_detail.html'
+
+    def get_queryset(self):
+        """La pantalla más pesada del sistema: recorre TODO lo del evento.
+
+        Consumo, personal, tarjetas, cargos y la receta plato por plato, y cada
+        una de esas cosas imprime el nombre de su producto o su unidad. Sin los
+        prefetch son ~160 consultas para un solo evento.
+        """
+        return super().get_queryset().prefetch_related(
+            'movimientos__producto__unidad_medida',
+            'personal__empleado', 'personal__puesto',
+            'tarjetas__menu', 'cargos',
+            'platos__lineas__producto__unidad_medida',
+        )
 
 
 # El evento no pide precio por cubierto: eso se carga tarjeta por tarjeta, que es
@@ -895,7 +928,9 @@ class MovimientoStockListView(ListView):
     def get_queryset(self):
         queryset = (
             MovimientoStock.objects
-            .select_related('producto', 'evento')
+            # producto__unidad_medida: cada renglón imprime la unidad, que desde
+            # RN-26 es otra FK. Sin eso son 50 consultas más por página.
+            .select_related('producto__unidad_medida', 'evento')
             .order_by('-fecha', '-pk')
         )
 
@@ -1085,7 +1120,12 @@ def productos_por_sector():
     """
     contexto = {'sectores': []}
     for clave, etiqueta in SECTOR_CHOICES:
-        productos = Producto.objects.filter(sector=clave, activo=True).order_by(Lower('nombre'))
+        productos = (
+            Producto.objects
+            .filter(sector=clave, activo=True)
+            .select_related('unidad_medida')      # la imprimen las cuatro pantallas
+            .order_by(Lower('nombre'))
+        )
         contexto[f'productos_{clave}'] = productos
         contexto['sectores'].append({
             'clave': clave,
