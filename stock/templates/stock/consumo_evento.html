@@ -11,6 +11,10 @@
     </div>
   </div>
   <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <a href="{% url 'stock:movimiento_list' %}?evento={{ evento.pk }}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">receipt_long</span><span>Historial</span>
+    </a>
     <a data-modal-link href="{% url 'stock:evento_detail' evento.pk %}"
        class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
       <span class="material-symbols-outlined text-[18px]">visibility</span><span>Ver detalle del evento</span>
@@ -19,17 +23,7 @@
 </header>
 
 <!-- Botonera de pestañas -->
-<div data-tabs data-tab-default="#barra-pane" role="tablist" aria-label="Sectores"
-     class="flex border-b border-outline-variant gap-stack-md sm:gap-gutter overflow-x-auto">
-  <button type="button" id="barra-tab" role="tab" aria-controls="barra-pane" aria-selected="false" data-tab-target="#barra-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Barra</button>
-  <button type="button" id="cocina-tab" role="tab" aria-controls="cocina-pane" aria-selected="false" data-tab-target="#cocina-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Cocina</button>
-  <button type="button" id="extras-tab" role="tab" aria-controls="extras-pane" aria-selected="false" data-tab-target="#extras-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Extras</button>
-  <button type="button" id="personal-tab" role="tab" aria-controls="personal-pane" aria-selected="false" data-tab-target="#personal-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Personal</button>
-</div>
+{% include 'stock/_tabs_sectores.html' with tab_extra_id='personal' tab_extra_label='Personal' %}
 
 {% if evento.menu %}
 <div class="flex items-start gap-stack-sm border border-primary/40 bg-primary/5 rounded-xl px-stack-md py-stack-sm">
@@ -44,17 +38,11 @@
 {% endif %}
 
 <!-- Paneles -->
-<div id="barra-pane" data-tab-panel role="tabpanel" aria-labelledby="barra-tab">
-  {% include 'stock/_tabla_consumo.html' with productos=productos_barra evento=evento tab_id='barra-pane' %}
+{% for sector in sectores %}
+<div id="{{ sector.clave }}-pane" data-tab-panel role="tabpanel" aria-labelledby="{{ sector.clave }}-tab"{% if not forloop.first %} class="hidden"{% endif %}>
+  {% include 'stock/_tabla_consumo.html' with productos=sector.productos evento=evento tab_id=sector.clave|add:"-pane" sin_precio=sector.sin_precio %}
 </div>
-
-<div id="cocina-pane" data-tab-panel role="tabpanel" aria-labelledby="cocina-tab" class="hidden">
-  {% include 'stock/_tabla_consumo.html' with productos=productos_cocina evento=evento tab_id='cocina-pane' %}
-</div>
-
-<div id="extras-pane" data-tab-panel role="tabpanel" aria-labelledby="extras-tab" class="hidden">
-  {% include 'stock/_tabla_consumo.html' with productos=productos_extras evento=evento tab_id='extras-pane' %}
-</div>
+{% endfor %}
 
 <div id="personal-pane" data-tab-panel role="tabpanel" aria-labelledby="personal-tab" class="hidden">
   <div class="bg-surface-raised rounded-xl border border-surface-overlay p-stack-lg">

@@ -12,26 +12,12 @@
   </div>
 </header>
 
-<div data-tabs data-tab-default="#barra-pane" role="tablist" aria-label="Sectores"
-     class="flex border-b border-outline-variant gap-stack-md sm:gap-gutter overflow-x-auto">
-  <button type="button" id="barra-tab" role="tab" aria-controls="barra-pane" aria-selected="false" data-tab-target="#barra-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Barra</button>
-  <button type="button" id="cocina-tab" role="tab" aria-controls="cocina-pane" aria-selected="false" data-tab-target="#cocina-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Cocina</button>
-  <button type="button" id="extras-tab" role="tab" aria-controls="extras-pane" aria-selected="false" data-tab-target="#extras-pane"
-          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">Extras</button>
-</div>
+{% include 'stock/_tabs_sectores.html' %}
 
-<div id="barra-pane" data-tab-panel role="tabpanel" aria-labelledby="barra-tab">
-  {% include 'stock/_tabla_merma.html' with productos=productos_barra tab_id='barra-pane' motivos=motivos %}
+{% for sector in sectores %}
+<div id="{{ sector.clave }}-pane" data-tab-panel role="tabpanel" aria-labelledby="{{ sector.clave }}-tab"{% if not forloop.first %} class="hidden"{% endif %}>
+  {% include 'stock/_tabla_merma.html' with productos=sector.productos tab_id=sector.clave|add:"-pane" motivos=motivos sin_precio=sector.sin_precio %}
 </div>
-
-<div id="cocina-pane" data-tab-panel role="tabpanel" aria-labelledby="cocina-tab" class="hidden">
-  {% include 'stock/_tabla_merma.html' with productos=productos_cocina tab_id='cocina-pane' motivos=motivos %}
-</div>
-
-<div id="extras-pane" data-tab-panel role="tabpanel" aria-labelledby="extras-tab" class="hidden">
-  {% include 'stock/_tabla_merma.html' with productos=productos_extras tab_id='extras-pane' motivos=motivos %}
-</div>
+{% endfor %}
 
 {% endblock %}

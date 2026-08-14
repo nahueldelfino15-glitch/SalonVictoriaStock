@@ -1,0 +1,100 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Avisos por mail</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      A quiénes les llega el recordatorio de los eventos, <strong class="text-on-surface">{{ dias_aviso }} días antes</strong>.
+    </p>
+  </div>
+
+  <a data-modal-link href="{% url 'stock:destinatario_create' %}"
+     class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+    <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar destinatario</span>
+  </a>
+</header>
+
+{% if not manda_de_verdad %}
+<div class="flex items-start gap-stack-sm border border-primary/40 bg-primary/5 rounded-xl px-stack-md py-stack-sm">
+  <span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-[2px]">warning</span>
+  <div>
+    <p class="font-body-md text-body-md text-on-surface-high">Los mails todavía no salen de verdad.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+      El sistema está con el backend de <strong>consola</strong>: los recordatorios se
+      imprimen en la terminal en vez de enviarse. Para que salgan hay que cargar los datos
+      del servidor de correo en las variables de entorno (están explicadas en el README).
+      Hasta entonces, todo lo demás de esta pantalla funciona igual.
+    </p>
+  </div>
+</div>
+{% endif %}
+
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Correo</th>
+          <th class="px-stack-md py-4 font-semibold">Nombre</th>
+          <th class="px-stack-md py-4 font-semibold">Estado</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for d in destinatarios %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">
+            <div class="flex items-center gap-stack-sm">
+              <span class="w-8 h-8 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary">
+                <span class="material-symbols-outlined text-[18px]">mail</span>
+              </span>
+              <span class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ d.email }}</span>
+            </div>
+          </td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ d.nombre|default:"—" }}</td>
+          <td class="px-stack-md py-4">
+            {% if d.activo %}
+            <span class="inline-flex items-center px-2 py-[2px] rounded-pill border border-primary/40 bg-primary/10 text-primary font-label-md text-[10px] uppercase tracking-wider">Recibe avisos</span>
+            {% else %}
+            <span class="inline-flex items-center px-2 py-[2px] rounded-pill border border-outline-variant text-on-surface-med font-label-md text-[10px] uppercase tracking-wider">Silenciado</span>
+            {% endif %}
+          </td>
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a data-modal-link href="{% url 'stock:destinatario_update' d.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:destinatario_delete' d.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">mark_email_unread</span>
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay nadie cargado.</p>
+            <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Sin destinatarios el recordatorio no se manda a nadie.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ destinatarios|length }} destinatario{{ destinatarios|length|pluralize }}</span>
+  </div>
+</div>
+
+<div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg flex flex-col gap-stack-sm">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Cómo se manda</h2>
+  <p class="font-body-sm text-body-sm text-on-surface-med">
+    Un recordatorio por evento, <strong class="text-on-surface">{{ dias_aviso }} días antes</strong>, con la fecha,
+    los asistentes, las tarjetas, la comida estimada y las notas. Cada evento se avisa
+    <strong class="text-on-surface">una sola vez</strong>.
+  </p>
+  <p class="font-body-sm text-body-sm text-on-surface-med">
+    Para probar sin mandar nada:
+  </p>
+  <pre class="bg-surface-base border border-outline-variant rounded-lg px-stack-md py-stack-sm overflow-x-auto font-body-sm text-body-sm text-on-surface"><code>python manage.py recordar_eventos --dry-run</code></pre>
+</div>
+
+{% endblock %}

@@ -15,7 +15,7 @@ personal, compras y consumo. Django monolítico, sin API, sin JS de framework.
 | Diseño | **Noir Luxury** — dark mode, negro en capas + dorado |
 | Fuentes | Hanken Grotesk + Material Symbols Outlined, Google Fonts |
 | Idioma | `es-ar` |
-| Zona horaria | `UTC` (⚠️ ver Deuda técnica) |
+| Zona horaria | `America/Argentina/Buenos_Aires` |
 | Auth | `LoginRequiredMiddleware` — **todo pide sesión** salvo `/ingresar/` |
 
 ### Comandos
@@ -44,18 +44,21 @@ config/            # settings, urls raíz, wsgi/asgi
   settings.py      # SECRET_KEY hardcodeada, DEBUG=True
   urls.py          # /admin/ + include('stock.urls')
 stock/
-  models.py        # 11 modelos, toda la lógica de negocio vive acá
+  models.py        # 13 modelos, toda la lógica de negocio vive acá
   views.py         # CBV para CRUD + FBV (home, compras, merma, calendario, consumo)
   urls.py          # namespace 'stock'
-  admin.py         # registra Producto, Evento, Empleado, MovimientoStock, Plato, Puesto
+  admin.py         # registra los 13 modelos
+  management/commands/
+    reconciliar_stock.py  # cierra el libro mayor con el stock declarado
+    recordar_eventos.py   # el job que avisa por mail (RN-24)
   context_processors.py # resuelve `base_template`: página completa o fragmento de modal
-  templates/stock/ # 41 templates
+  templates/stock/ # 50 templates
     base.html      # tokens Tailwind + sidebar + helpers JS (tabs, modales, modal remoto)
     _base_modal.html  # base "vacía": sirve cualquier pantalla como fragmento (RN-22)
     _tabla_*.html  # 4 parciales de tabla (productos, compras, consumo, merma)
     _chip_estado.html # chip de estado del evento, compartido por 7 pantallas
   static/stock/img/LogoVictoria.png
-  migrations/      # 0001 → 0010
+  migrations/      # 0001 → 0015
 db.sqlite3
 manage.py
 ```
@@ -81,8 +84,13 @@ Menu ─────┼──> Evento <── PersonalEvento ──> Empleado �
 ```
 
 ### `Producto`
-Unidad de stock. `sector` ∈ `barra | cocina | extras`.
-Campos: `nombre`, `sector`, `precio_unitario` (Decimal 10,2), `stock_actual` (**PositiveInteger**), `unidad_medida` (texto libre, default `'unidad'`).
+Unidad de stock. `sector` ∈ `barra | cocina | extras | limpieza | mobiliario` (RN-8).
+Campos: `nombre`, `sector`, `precio_unitario` (Decimal 10,2, **opcional**), `stock_actual`
+(Decimal 10,2), `unidad_medida` (texto libre, default `'unidad'`), `activo` (baja lógica, RN-20).
+
+### `DestinatarioAviso`
+A quién le llegan los recordatorios por mail. `email` (único), `nombre`, `activo`.
+Ver RN-24.
 
 ### `Paquete` / `Menu`
 Catálogos planos que se asocian a un evento. `Paquete` tiene `precio`, `Menu` no.
@@ -91,7 +99,15 @@ Ambos con `on_delete=SET_NULL` desde `Evento`.
 ### `Evento`
 Núcleo del sistema. `estado` ∈ `pendiente | confirmado | finalizado`.
 Campos: `nombre`, `fecha` (DateField, sin hora), `asistentes`, `estado`, `paquete` (FK opcional), `menu` (FK opcional), `telefono_contacto`, `notas`.
-Propiedades calculadas: `gasto_stock`, `gasto_personal`, `gasto_total`.
+Plata: `precio_cerrado`, `precio_por_persona`, `precio_paquete` (sellado, RN-17),
+`brindis_asistentes`, `brindis_valor`.
+Propiedades calculadas: `ingreso_*`, `desglose_ingresos`, `margen`, `gasto_stock`,
+`gasto_personal`, `gasto_total`.
+
+### `TarjetaEvento`
+Lo que paga cada tipo de invitado, y qué come. Ver RN-23.
+`evento` (CASCADE), `concepto`, `cantidad` (personas), `valor_unitario`,
+`menu` (FK opcional, **SET_NULL**: si se borra el menú la tarjeta sigue valiendo plata).
 
 ### `Puesto`
 Catálogo de puestos, administrable desde `/puestos/`. Solo `nombre` (único).
@@ -115,8 +131,10 @@ La receta de un menú, en dos niveles. Ver RN-18.
 (Decimal 10,**3**).
 
 ### `MovimientoStock`
-Libro mayor del stock. `tipo` ∈ `entrada | salida`.
-`producto` (CASCADE), `evento` (SET_NULL, **opcional**), `tipo`, `cantidad`, `fecha` (auto).
+Libro mayor del stock. `tipo` ∈ `entrada | salida | merma` (RN-12).
+`producto` (**PROTECT**, RN-20), `evento` (SET_NULL, **opcional**), `tipo`, `motivo`,
+`cantidad`, `costo_unitario` (sellado, RN-15), `fecha` (auto).
+Se ve entero en `/movimientos/`, con filtros por tipo, sector, producto, evento y fechas.
 
 ---
 
@@ -129,9 +147,8 @@ Libro mayor del stock. `tipo` ∈ `entrada | salida`.
 - `entrada` → suma a `stock_actual`
 - `salida` → resta de `stock_actual`
 
-Excepción real: el campo `stock_actual` está editable en el form de Producto
-(alta y edición), así que un alta con "stock inicial" lo escribe directo sin
-generar movimiento. Es intencional para la carga inicial.
+⚠️ Ya NO hay excepción: `stock_actual` salió del form de edición y el "stock
+inicial" del alta se escribe como un movimiento de entrada (RN-14).
 
 ### RN-2 · No se puede consumir más stock del que hay
 `MovimientoStock.clean()` bloquea cualquier `salida` mayor al stock disponible y
@@ -196,10 +213,25 @@ El estado `finalizado` es el que separa las dos listas:
 No hay transición automática de estado — pasar a `finalizado` es manual desde el
 form de evento.
 
-### RN-8 · Los productos viven en 3 sectores, siempre
-`barra`, `cocina`, `extras` están hardcodeados en `SECTOR_CHOICES` y se repiten
-como tres pestañas en **Productos**, Compras, Merma y Consumo. Agregar un sector
-implica tocar el modelo **y** las cuatro pantallas.
+### RN-8 · Los productos viven en sectores, y no todos se valorizan
+`SECTOR_CHOICES` tiene cinco: `barra`, `cocina`, `extras`, `limpieza`, `mobiliario`.
+Aparecen como pestañas en **Productos**, Compras, Merma y Consumo.
+
+**Agregar un sector es una línea**: las cuatro pantallas iteran sobre `sectores`
+(que arma `views.productos_por_sector()`) en vez de tener las pestañas escritas a
+mano. Antes eran ocho bloques duplicados y se olvidaba siempre alguno.
+
+`SECTORES_SIN_PRECIO` = `('mobiliario',)`. La vajilla, los manteles y los vasos se
+**cuentan pero no se valorizan**: son del salón, no mercadería que se consuma. Sin
+precio no suman a `gasto_stock`, que es justo lo que se quiere — si no, cada mantel
+usado le inflaría el costo a la fiesta. El flag viaja a los templates como
+`sin_precio` (en negativo a propósito: si un `include` se lo olvida, la columna
+aparece en vez de desaparecer en silencio).
+
+⚠️ El precio quedó **opcional en el form** y `Producto.save()` convierte `None` en 0.
+No se esconde el campo según el sector porque eso pide JS, y los `<script>` que
+entran por `innerHTML` no se ejecutan dentro de un modal (RN-22): sería un campo
+que desaparece en la pantalla suelta y queda a la vista en el modal.
 
 Orden de listado: `Lower('nombre')` — alfabético case-insensitive.
 
@@ -284,36 +316,144 @@ no tiene es un **500**, no un mensaje de validación. Misma trampa que con `moti
 la validación corre **antes** que `form_valid()`, así que sin eso `clean()` no vería
 el evento y el bloqueo no se dispararía nunca en el alta.
 
-### RN-17 · Rentabilidad: ingreso − costo = margen
+### RN-17 · Rentabilidad: TODO lo facturado − los dos gastos
 El sistema dejó de medir solo costos.
 
 ```
-ingreso_base   = precio_cerrado  (si está cargado)
-                 si no: precio_por_persona × asistentes
-                 si no hay ninguno: 0
-ingreso_cargos = Σ CargoEvento.monto
-ingreso_total  = ingreso_base + ingreso_cargos
-margen         = ingreso_total − gasto_total
+ingreso_tarjetas = Σ (tarjeta.cantidad × tarjeta.valor_unitario)     ← RN-23
+ingreso_brindis  = brindis_asistentes × brindis_valor
+ingreso_paquete  = precio_paquete            (monto TOTAL, sellado)
+ingreso_base     = precio_cerrado + precio_por_persona × asistentes
+ingreso_cargos   = Σ CargoEvento.monto
+
+ingreso_total    = tarjetas + brindis + paquete + base + cargos
+margen           = ingreso_total − gasto_stock − gasto_personal
 ```
+
+**Todo suma; nada pisa a nada.** Antes el `precio_cerrado` mandaba sobre el
+`precio_por_persona`; el dueño pidió que se sumen. La contra es real: cargar las
+tarjetas Y el precio por persona factura la misma plata dos veces. Por eso existe
+`Evento.desglose_ingresos` y la pantalla muestra **cada renglón abierto** — con un
+total pelado eso no se ve nunca; con el detalle a la vista, sí. El desglose es
+parte de la regla, no decoración.
 
 `CargoEvento` son los adicionales facturables (barra libre, DJ, hora extra).
 **Se llama CARGO y no "extra" a propósito**: `extras` ya es un sector de stock
 (RN-8), que es un COSTO. Este es un INGRESO. Mismo nombre para conceptos opuestos
 es garantía de que alguien los sume mal.
 
-Hay dos formas de precio porque las dos existen en la realidad del salón: hay
-eventos que se cierran por un monto total y otros que se cobran por cubierto. El
-cerrado manda si están los dos.
+#### El monto del paquete se sella, no se lee del catálogo
+`Evento.precio_paquete` guarda lo que salía el paquete **cuando se lo eligió**, y
+`Evento.save()` lo completa solo. `ingreso_paquete` lee ese campo y **nunca**
+`paquete.precio`.
 
-⚠️ **`ingreso_base` NO se deduce de `Paquete.precio`, a propósito.** Ese campo es
-ambiguo: el paquete "Premium" está cargado en `129013`, que es el precio TOTAL. Si
-se lo tomara como por-persona, el evento de 15 (123 asistentes) mostraría
-$15.868.599 facturados con 100% de margen. Un número inventado que parece real es
-peor que no tener número: por eso, sin precio cargado, la pantalla dice
-"sin precio" y no "$0".
+Es RN-15 del lado del ingreso, y cierra dos agujeros medidos:
+- editarle el precio a "Premium" cambiaba la facturación de todos los eventos ya
+  cerrados que lo usaran;
+- borrar "Premium" del catálogo (`Evento.paquete` es `SET_NULL`) bajaba un evento
+  cerrado de $129.013 a **$0** de un click, y mostraba el número nuevo con total
+  confianza. Exactamente el bug de RN-20, pero con la plata que entra.
 
-`Evento.tiene_precio_cargado` distingue esos dos casos, y `margen_porcentaje`
-devuelve `None` cuando no hay ingreso en vez de dividir por cero.
+El campo es editable: un evento se puede haber cerrado por otro número que el de
+la lista, y corregirlo a mano no lo pisa el catálogo.
+
+⚠️ El paquete es un **monto total**, no un precio por cubierto. Multiplicarlo por
+los asistentes inventaría facturación: el evento de 15 (123 asistentes) mostraría
+$15.868.599 en vez de $129.013.
+
+`Evento.tiene_precio_cargado` es `bool(ingreso_total)`: sin nada cargado la
+pantalla dice "sin precio" y no "$0". `margen_porcentaje` devuelve `None` cuando no
+hay ingreso, en vez de dividir por cero.
+
+### RN-23 · Las tarjetas: quién paga cuánto, y quién come qué
+`TarjetaEvento` es un tipo de invitado dentro del evento: `concepto`, `cantidad`,
+`valor_unitario` y un `menu` opcional. Una misma fiesta de 100 puede ser 80
+tarjetas de adulto a un precio y 20 de menú infantil a otro — por eso son filas y
+no un precio único en el evento.
+
+⚠️ En este modelo `cantidad` son **personas** (no unidades de stock, como en
+`MovimientoStock.cantidad`) y `valor_unitario` es un **ingreso** (no el costo de
+`Producto.precio_unitario`). Los nombres se repiten en el proyecto con sentidos
+opuestos: mirar de qué modelo es antes de sumar.
+
+**La comida se calcula por tarjeta.** `Evento.raciones_por_menu()` arma
+`{menu_id: porciones}` desde las tarjetas, y `copiar_receta_del_menu()` copia los
+platos de cada menú dejándoles las porciones que les tocan en `Plato.porciones`.
+Después `consumo_sugerido` multiplica por **las porciones del plato**, no por los
+asistentes del evento: 80 raciones de un menú y 20 de otro no son 100 de cada uno.
+
+- Dos tarjetas del mismo menú se **suman en un solo bloque** (80 adultos + 10
+  músicos del mismo menú = 90 raciones, no dos recetas iguales una abajo de la otra).
+- Una tarjeta **sin menú** factura pero no pide comida.
+- Un producto que está en los dos menús sale en **una sola línea** de consumo, con
+  el total sumado antes de redondear (RN-19).
+- Guardar o borrar una tarjeta **recopia la receta** del evento. Sin eso, agregar
+  "20 menús infantiles" sumaría la plata pero la comida seguiría calculando 80
+  raciones de adulto, y nadie lo notaría hasta que falte.
+
+⚠️ Si hay tarjetas con menú, **ellas mandan**: un plato del evento sin `porciones`
+(cargado a mano desde el admin) se ignora. Sin esa guarda se sumaba en paralelo,
+100 raciones arriba de las 80 + 20, sin ningún aviso.
+
+⚠️ Recopiar **borra y recrea** los platos del evento, así que sus `pk` cambian cada
+vez que se toca una tarjeta. Es coherente con RN-18 ("copiar reemplaza"), pero pasa
+mucho más seguido que antes: no guardes referencias a un plato de evento.
+
+Retrocompatibilidad: un evento **sin tarjetas** cae a `Evento.menu × asistentes`,
+que es como funcionaba antes y lo que siguen usando los eventos ya cargados.
+
+⚠️ En ese caso los platos se copian con `porciones = None`, NO con el número de
+asistentes del momento. Sellarlo ahí congelaba la cuenta: corregir los asistentes de
+100 a 150 dejaba la receta pidiendo para 100, y un evento cargado con 0 asistentes
+(hay uno real: "Casamiento Nascar") quedaba sugiriendo 0 de todo para siempre. Con
+`None`, `consumo_sugerido` y `Plato.para()` multiplican **en vivo**.
+
+`Evento.tarjetas_vs_asistentes` avisa si las tarjetas no cuadran con los asistentes,
+pero **no bloquea**: en un salón los números bailan hasta último momento y trabar la
+carga sería peor que el aviso.
+
+⚠️ La recopia se dispara por **señal** (`post_save`/`post_delete` de `TarjetaEvento`),
+no sobrescribiendo `save()`/`delete()`. Es la misma trampa que ya se comió este
+proyecto con `MovimientoStock`: `queryset.delete()` NO pasa por `Model.delete()`, así
+que borrar tarjetas en masa desde el admin dejaba la receta con los platos de un
+grupo que ya no existía. Las señales sí se emiten en todos esos caminos.
+
+### RN-24 · Los recordatorios los manda un job, no la app
+`python manage.py recordar_eventos` avisa por mail los eventos que se vienen. Se
+corre **una vez por día desde afuera** (Programador de tareas de Windows, cron, o un
+HTTP call): el comando no sabe ni le importa quién lo dispara, y por eso sirve igual
+si algún día la app se muda a un servidor.
+
+```bash
+python manage.py recordar_eventos --dry-run    # muestra qué mandaría, sin mandar
+python manage.py recordar_eventos --dias 15    # otra anticipación, por esta vez
+python manage.py recordar_eventos --reenviar   # ignora que ya se avisó
+```
+
+`DestinatarioAviso` es una tabla con CRUD en `/destinatarios/`, no un setting: mismo
+criterio que los puestos (RN-21). `activo` corta el aviso sin perder la dirección.
+
+**Es una VENTANA (de hoy a hoy+N), no un día exacto.** Con la fecha justa, si la
+máquina estuvo apagada el día que le tocaba a un evento, ese aviso se perdía para
+siempre y nadie se enteraba. `Evento.aviso_enviado_el` es lo que evita repetir; se
+puede vaciar para que vuelva a salir.
+
+⚠️ El evento se marca como avisado **solo si el mail salió**. Marcarlo antes sería
+peor que fallar: no se reintenta nunca y el aviso se pierde en silencio.
+
+El backend de mail **se elige solo**: si hay `EMAIL_HOST` en el entorno usa SMTP, y
+si no imprime por la terminal. Así una máquina recién clonada arranca sin configurar
+nada y nadie le manda un mail de prueba a un cliente real por accidente. La pantalla
+de `/destinatarios/` avisa cuando está en modo consola.
+
+⚠️ El cuerpo del mail se imprime con `_mostrar()` y no con `stdout.write()` directo:
+la consola de Windows es cp1252 y levanta `UnicodeEncodeError` con lo que no entra.
+Las notas del evento son texto libre — un emoji alcanzaba para tirar abajo el
+`--dry-run` y dejarte sin poder revisar qué se iba a mandar.
+
+⚠️ El día de la semana sale con `django.utils.formats.date_format`, no con
+`strftime('%A')`: el segundo usa el idioma del **sistema operativo** y mandaba
+"Sunday" en un mail que lee gente del salón.
 
 ### RN-18 · La receta se carga en el MENÚ, organizada por platos
 La receta es un árbol de tres niveles:
@@ -449,6 +589,54 @@ suelta sigue andando. Los botones "Cancelar" llevan
 `{% if es_modal %}data-modal-close{% endif %}` — condicional, porque el atributo
 suelto haría `preventDefault()` en la página normal y el link no navegaría.
 
+### RN-24 · Dos roles, y el rol es un booleano que Django ya trae
+Hay **administrador** y **empleado**. Nada más, y por eso el rol NO es un modelo
+nuevo ni un `Group`: es `User.is_staff`.
+
+| `is_staff` | Rol | Qué puede |
+|-----------|-----|-----------|
+| `True` | Administrador | Todo el sistema, `/usuarios/` y `/admin/` |
+| `False` | Empleado | Todo menos `/usuarios/` (el recorte fino está por definirse) |
+
+Dos roles son un booleano. Una tabla `Rol` con su FK, su migración y su CRUD para
+guardar un bit sería el clásico caso de construir el edificio antes de saber si
+hay inquilinos. Y `is_staff` de yapa **cierra `/admin/` solo**: el empleado queda
+afuera de las dos puertas con una sola marca, sin código de por medio.
+
+El gating es `SoloAdminMixin` (en `views.py`): `test_func` mira `is_staff` y
+`handle_no_permission` redirige a la home con un mensaje en vez de tirar un 403
+pelado — la sesión ya existe (la exige `LoginRequiredMiddleware`), así que lo
+único que cae ahí es un empleado tocando una URL que no le toca. **Para restringir
+otra pantalla al administrador, alcanza con colgarle el mixin.**
+
+El grupo "Sistema" del sidebar va dentro de `{% if user.is_staff %}`. Esconder el
+link es prolijidad; lo que frena de verdad es el mixin.
+
+**El módulo de usuarios**: alta con `UserCreationForm` (la subclase solo agrega
+`is_staff` a `Meta.fields` — las dos contraseñas y sus validadores ya están
+resueltos), edición de nombre/rol/acceso, contraseña con `SetPasswordForm`, y
+baja. Las tres pantallas de form comparten `usuario_form.html`, que recibe
+`titulo` y `subtitulo` por `extra_context`.
+
+⚠️ **Nadie se saca a sí mismo el acceso ni se borra.** El último administrador
+degradándose deja el sistema sin nadie que pueda entrar a arreglarlo. Al editarse
+a uno mismo, `is_staff` e `is_active` van con `disabled=True` (que además ignora
+lo que venga por POST, no solo lo esconde), y `UsuarioDeleteView.get_queryset()`
+se excluye a sí mismo → 404. Va en la vista, no en el template: el botón se
+esconde, la URL no.
+
+⚠️ **Degradar a empleado también apaga `is_superuser`.** Sin eso, un superusuario
+bajado de rango sale del módulo pero conserva TODOS los permisos de Django y pasa
+cualquier `has_perm` que se agregue después.
+
+⚠️ Un administrador que no sea superusuario entra a `/admin/` y ve la pantalla
+**vacía**: `is_staff` abre la puerta, los permisos son otra cosa. Es correcto —
+el sistema se opera desde las pantallas propias, no desde el admin.
+
+⚠️ Los usuarios son la única tabla del sistema **sin FK que la proteja**: borrar
+uno no arrastra nada (ningún modelo apunta a `User`). Para alguien que se fue pero
+podría volver, la opción buena es destildar "Puede ingresar", no borrar.
+
 ---
 
 ## 5. Flujos de usuario
@@ -475,6 +663,11 @@ ya multiplicadas por los asistentes.
 
 **Ver rentabilidad de un evento** → `/eventos/<pk>/` → receta estimada + tabla de
 consumo + tabla de personal + cargos + margen.
+
+**Dar de alta a alguien que va a usar el sistema** → `/usuarios/` (solo el
+administrador lo ve) → `Nuevo usuario` → nombre + contraseña, y tildar
+"Administrador" solo si va a manejar todo. La persona ya puede entrar por
+`/ingresar/`. Si se olvida la clave, el icono 🔑 de la fila se la cambia (RN-24).
 
 ---
 
@@ -593,10 +786,9 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
    con la inflación. Se resuelve en la Fase 2 (congelar el costo unitario en cada
    movimiento).
 
-3. **`Paquete.precio` sigue sin usarse.** Con RN-17 el precio se carga en el evento
-   (`precio_cerrado` / `precio_por_persona`), no se hereda del paquete, porque el
-   dato cargado es ambiguo. Los 3 eventos existentes quedaron **sin precio**: hay
-   que cargárselo a mano para que muestren margen.
+3. ~~`Paquete.precio` sin usar~~ — **resuelto**: se sella en `Evento.precio_paquete`
+   al elegir el paquete (RN-17), como monto total. El evento de 15 pasó de mostrar
+   $0 a $129.013. Los otros dos siguen sin precio: hay que cargarles las tarjetas.
 
 4. **`Menu` sigue sin precio de venta.** Ya tiene composición y
    `costo_por_persona` (RN-18), así que se sabe cuánto CUESTA el cubierto, pero no
@@ -606,7 +798,8 @@ Un `QueryDict` o un atributo inexistente **usado como argumento de filtro**
 ### 🟡 Medios
 
 5. **`MovimientoStock.fecha` es `auto_now_add`**, no editable: si cargás el lunes
-   lo del sábado, la fecha miente.
+   lo del sábado, la fecha miente. Ahora se nota más, porque el **historial de
+   movimientos** (`/movimientos/`) la muestra y se puede filtrar por rango.
 
 6. **`horas_trabajadas` no calcula el pago** y ni `Empleado` ni `Puesto` tienen
    tarifa. El pago se carga a mano en cada evento, y el mismo empleado puede

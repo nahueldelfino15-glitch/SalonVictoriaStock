@@ -346,6 +346,9 @@ prendería TODO el nav.
     <a title="Merma" class="{% if un in '|merma|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:merma' %}">
       <span class="material-symbols-outlined text-[22px] shrink-0">delete_sweep</span><span class="sidebar-label truncate">Merma</span>
     </a>
+    <a title="Movimientos" class="{% if un in '|movimiento_list|movimientostock_update|movimientostock_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:movimiento_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">receipt_long</span><span class="sidebar-label truncate">Movimientos</span>
+    </a>
 
     <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Eventos</p>
     <a title="Eventos" class="{% if un in '|evento_list|evento_detail|evento_create|evento_update|evento_delete|personalevento_create|personalevento_update|personalevento_delete|movimientostock_create|movimientostock_update|movimientostock_delete|cargoevento_create|cargoevento_update|cargoevento_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:evento_list' %}">
@@ -372,10 +375,23 @@ prendería TODO el nav.
       <span class="material-symbols-outlined text-[22px] shrink-0">badge</span><span class="sidebar-label truncate">Puestos</span>
     </a>
 
+    {% comment %}
+    Todo este grupo es del administrador (RN-24). El empleado no lo ve, y si
+    llega a la URL igual lo frena SoloAdminMixin: esconder el link es prolijidad,
+    no seguridad.
+    {% endcomment %}
+    {% if user.is_staff %}
     <p class="sidebar-grupo px-stack-md pt-stack-md pb-unit font-label-md text-label-md uppercase tracking-wider text-on-surface-med">Sistema</p>
+    <a title="Avisos por mail" class="{% if un in '|destinatario_list|destinatario_create|destinatario_update|destinatario_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:destinatario_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">forward_to_inbox</span><span class="sidebar-label truncate">Avisos</span>
+    </a>
+    <a title="Usuarios" class="{% if un in '|usuario_list|usuario_create|usuario_update|usuario_password|usuario_delete|' %}{{ cls_on }}{% else %}{{ cls_off }}{% endif %}" href="{% url 'stock:usuario_list' %}">
+      <span class="material-symbols-outlined text-[22px] shrink-0">manage_accounts</span><span class="sidebar-label truncate">Usuarios</span>
+    </a>
     <a title="Admin" class="{{ cls_off }}" href="/admin/">
       <span class="material-symbols-outlined text-[22px] shrink-0">settings</span><span class="sidebar-label truncate">Admin</span>
     </a>
+    {% endif %}
   </nav>
 </aside>
 

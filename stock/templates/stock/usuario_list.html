@@ -1,0 +1,98 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<!-- ============================ Encabezado ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Usuarios</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">Quién puede entrar al sistema y con qué rol.</p>
+  </div>
+
+  <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-stack-md w-full sm:w-auto">
+    <form method="get" class="relative w-full sm:w-[260px]">
+      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-med pointer-events-none text-[20px]">search</span>
+      <label class="sr-only" for="q-usuarios">Buscar usuarios</label>
+      <input type="text" name="q" id="q-usuarios" aria-label="Buscar usuarios" value="{{ q|default:'' }}" placeholder="Buscar usuario..." class="w-full !pl-10 !pr-10 font-body-sm text-body-sm">
+      <button type="submit" aria-label="Buscar" class="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-med hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+      </button>
+    </form>
+
+    <a data-modal-link href="{% url 'stock:usuario_create' %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+      <span class="material-symbols-outlined text-[18px]">person_add</span><span>Nuevo usuario</span>
+    </a>
+  </div>
+</header>
+
+<!-- ============================== Tabla =============================== -->
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Usuario</th>
+          <th class="px-stack-md py-4 font-semibold">Rol</th>
+          <th class="px-stack-md py-4 font-semibold">Estado</th>
+          <th class="px-stack-md py-4 font-semibold">Último ingreso</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for u in usuarios %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4">
+            <div class="flex items-center gap-stack-sm">
+              <span class="w-8 h-8 shrink-0 rounded-pill bg-primary/10 border border-primary/40 flex items-center justify-center text-primary font-label-md text-label-md uppercase">{{ u.username|slice:":1"|upper }}</span>
+              <span class="font-body-md text-body-md text-on-surface-high group-hover:text-primary transition-colors">{{ u.username }}</span>
+              {% if u == request.user %}
+              <span class="text-on-surface-med font-body-sm text-body-sm">(vos)</span>
+              {% endif %}
+            </div>
+          </td>
+          <td class="px-stack-md py-4">
+            {% if u.is_staff %}
+            <span class="inline-flex items-center gap-unit border border-primary/40 bg-primary/10 text-primary px-unit py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[14px]">shield_person</span>Administrador
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-unit border border-outline-variant bg-surface-base text-on-surface-variant px-unit py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[14px]">badge</span>Empleado
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-stack-md py-4">
+            {% if u.is_active %}
+            <span class="text-on-surface-med">Activo</span>
+            {% else %}
+            <span class="inline-flex items-center gap-unit border border-error/50 bg-error/10 text-error px-unit py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">Sin acceso</span>
+            {% endif %}
+          </td>
+          <td class="px-stack-md py-4 text-on-surface-med">{{ u.last_login|date:"d/m/Y H:i"|default:"Nunca entró" }}</td>
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a data-modal-link href="{% url 'stock:usuario_update' u.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:usuario_password' u.pk %}" aria-label="Cambiar contraseña" title="Cambiar contraseña" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">key</span></a>
+            {% if u != request.user %}
+            <a data-modal-link href="{% url 'stock:usuario_delete' u.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">manage_accounts</span>
+            <p class="font-body-md text-body-md text-on-surface-med">No hay usuarios que coincidan con la búsqueda.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex justify-between items-center text-on-surface-med font-body-sm text-body-sm">
+    <span>{{ usuarios|length }} usuario{{ usuarios|length|pluralize }}</span>
+    <span>El administrador ve todo; el empleado, solo lo operativo.</span>
+  </div>
+</div>
+
+{% endblock %}

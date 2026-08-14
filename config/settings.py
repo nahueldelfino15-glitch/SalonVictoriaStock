@@ -164,8 +164,34 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 #
 # Antes esto era un diccionario llamado MAILERS, que Django ignora por completo:
-# el setting real se llama EMAIL_BACKEND y es un string. Hoy el sistema no manda
-# ningun mail; con el backend de consola, si algun dia se manda uno, sale por la
-# terminal en vez de intentar conectarse a un SMTP inexistente.
+# el setting real se llama EMAIL_BACKEND y es un string.
+#
+# El backend se elige SOLO: si hay un servidor de correo cargado en el entorno usa
+# SMTP, y si no imprime los mails por la terminal. Asi la app arranca y funciona en
+# una maquina recien clonada sin configurar nada, y nadie manda un mail de prueba a
+# un cliente real por accidente.
+#
+# Para que salgan de verdad (ej. Gmail con una CONTRASENA DE APLICACION, no la
+# personal), definir estas variables de entorno:
+#
+#   EMAIL_HOST=smtp.gmail.com
+#   EMAIL_PORT=587
+#   EMAIL_HOST_USER=salonvictoria@gmail.com
+#   EMAIL_HOST_PASSWORD=xxxxxxxxxxxxxxxx
+#   DEFAULT_FROM_EMAIL=Salon Victoria <salonvictoria@gmail.com>
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '1') == '1'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Salon Victoria <no-reply@localhost>')
+
+EMAIL_BACKEND = (
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+
+# Con cuantos dias de anticipacion avisar un evento (RN-24). El comando
+# `recordar_eventos` lo puede pisar con --dias.
+DIAS_AVISO_EVENTO = int(os.environ.get('DIAS_AVISO_EVENTO', '7'))

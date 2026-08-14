@@ -1,0 +1,60 @@
+{% extends base_template|default:'stock/base.html' %}
+{% comment %}
+Sirve para las tres pantallas de usuario (alta, edición y contraseña): las tres
+son "un form y dos botones", y lo único que cambia son el título y los campos,
+que ya vienen resueltos desde la vista.
+{% endcomment %}
+{% block content %}
+
+<div class="w-full max-w-lg mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+
+  <div class="mb-stack-lg">
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{{ titulo }}</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">{{ subtitulo }}</p>
+  </div>
+
+  <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="flex flex-col gap-unit border border-error/50 bg-error/10 rounded-lg px-stack-md py-stack-sm">
+      {% for error in form.non_field_errors %}
+      <p class="font-body-sm text-body-sm text-error flex items-start gap-stack-sm">
+        <span class="material-symbols-outlined text-[18px] shrink-0 mt-[2px]">error</span><span>{{ error }}</span>
+      </p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% for field in form %}
+    {% if field.field.widget.input_type == 'checkbox' %}
+    {# El checkbox va con la etiqueta al lado: con el w-full del form quedaría una barra dorada. #}
+    <div class="flex flex-col gap-unit">
+      <label class="flex items-start gap-stack-sm cursor-pointer [&_input]:!w-5 [&_input]:!h-5 [&_input]:shrink-0 [&_input]:mt-[2px] [&_input]:accent-primary" for="{{ field.id_for_label }}">
+        {{ field }}
+        <span>
+          <span class="font-label-md text-label-md text-primary uppercase tracking-wider block">{{ field.label }}</span>
+          {% if field.help_text %}<span class="font-body-sm text-body-sm text-on-surface-med block mt-unit">{{ field.help_text }}</span>{% endif %}
+        </span>
+      </label>
+      {% if field.errors %}<p class="font-body-sm text-body-sm text-error">{{ field.errors|striptags }}</p>{% endif %}
+    </div>
+    {% else %}
+    <div class="flex flex-col gap-unit">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<p class="font-body-sm text-body-sm text-on-surface-med">{{ field.help_text }}</p>{% endif %}
+      {% if field.errors %}<p class="font-body-sm text-body-sm text-error">{{ field.errors|striptags }}</p>{% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+      <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:usuario_list' %}" class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+      <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
+    </div>
+  </form>
+
+</div>
+
+{% endblock %}

@@ -3,9 +3,14 @@
     <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
       <thead>
         <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          {% comment %}
+          El mobiliario se cuenta pero no se valoriza (RN-8): manteles y vajilla no son
+          mercadería que se consuma. `sin_precio` va en negativo a propósito — si un
+          include se lo olvidara, la columna aparece en vez de desaparecer en silencio.
+          {% endcomment %}
           <th class="px-stack-md py-4 font-semibold">Nombre</th>
           <th class="px-stack-md py-4 font-semibold">Stock</th>
-          <th class="px-stack-md py-4 font-semibold">Precio</th>
+          {% if not sin_precio %}<th class="px-stack-md py-4 font-semibold">Precio</th>{% endif %}
           <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
         </tr>
       </thead>
@@ -25,7 +30,7 @@
           <td class="px-stack-md py-4">
             <span class="inline-flex items-center gap-unit border border-outline-variant bg-surface-base text-on-surface-variant px-unit py-[2px] rounded font-label-md text-[10px] uppercase tracking-wider">{{ producto.stock_actual }} {{ producto.unidad_medida }}</span>
           </td>
-          <td class="px-stack-md py-4 text-on-surface-med">$ {{ producto.precio_unitario }}</td>
+          {% if not sin_precio %}<td class="px-stack-md py-4 text-on-surface-med">$ {{ producto.precio_unitario }}</td>{% endif %}
           <td class="px-stack-md py-4 text-right whitespace-nowrap">
             <a data-modal-link href="{% url 'stock:producto_detail' producto.pk %}" aria-label="Ver" title="Ver" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">visibility</span></a>
             <a data-modal-link href="{% url 'stock:producto_update' producto.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">edit</span></a>
@@ -41,7 +46,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" class="px-stack-md py-16 text-center">
+          <td colspan="{% if sin_precio %}3{% else %}4{% endif %}" class="px-stack-md py-16 text-center">
             <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inbox</span>
             <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay productos cargados en este sector.</p>
           </td>

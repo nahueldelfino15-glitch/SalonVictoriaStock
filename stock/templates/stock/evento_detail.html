@@ -103,15 +103,14 @@
   {% endif %}
 </section>
 
-<!-- ===================== Receta del evento (RN-18 / RN-19) ===================== -->
-{% if evento.menu %}
+<!-- ===================== Receta del evento (RN-18 / RN-19 / RN-23) ===================== -->
+{% if evento.platos.exists %}
 <section class="flex flex-col gap-stack-md">
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
     <div>
       <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Receta del evento</h2>
       <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
-        Heredada de <a data-modal-link href="{% url 'stock:menu_detail' evento.menu.pk %}" class="text-primary hover:underline">{{ evento.menu.nombre }}</a>
-        y calculada para {{ evento.asistentes|default:0 }} persona{{ evento.asistentes|default:0|pluralize }}.
+        Sale de los menús de las tarjetas: cada grupo pide por su cuenta.
         Es una estimación: <strong class="text-on-surface">no descuenta stock</strong>.
       </p>
     </div>
@@ -134,7 +133,12 @@
 
       {% for plato in grupo.platos %}
       <div class="px-stack-lg py-stack-md border-t border-surface-overlay">
-        <p class="font-body-md text-body-md text-on-surface-high">{{ plato.nombre }}</p>
+        <p class="font-body-md text-body-md text-on-surface-high">
+          {{ plato.nombre }}
+          {% if plato.porciones %}
+          <span class="ml-stack-sm inline-flex items-center px-2 py-[2px] rounded-pill border border-primary/40 bg-primary/10 text-primary font-label-md text-[10px] uppercase tracking-wider">{{ plato.porciones }} porcion{{ plato.porciones|pluralize:"es" }}</span>
+          {% endif %}
+        </p>
         <ul class="mt-stack-sm flex flex-col gap-unit">
           {% for item in plato.ingredientes %}
           <li class="flex flex-wrap justify-between gap-stack-sm font-body-sm text-body-sm">
@@ -154,7 +158,7 @@
     {% endfor %}
 
     <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex flex-wrap justify-between gap-stack-sm items-center text-on-surface-med font-body-sm text-body-sm">
-      <span>Cantidades estimadas para {{ evento.asistentes|default:0 }} persona{{ evento.asistentes|default:0|pluralize }}</span>
+      <span>Cantidades estimadas según las tarjetas cargadas</span>
       <span>Costo estimado: <span class="text-primary font-semibold">$ {{ evento.costo_receta_estimado|floatformat:2 }}</span></span>
     </div>
   </div>
@@ -273,6 +277,91 @@
 
 </div>
 
+<!-- ===================== Tarjetas ===================== -->
+<section class="flex flex-col gap-stack-md w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
+    <div>
+      <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Tarjetas</h2>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Lo que paga cada tipo de invitado. Una fiesta puede tener varios valores a la vez.</p>
+    </div>
+    {% if not evento.cerrado %}
+    <a data-modal-link href="{% url 'stock:tarjetaevento_create' evento.pk %}"
+       class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+      <span class="material-symbols-outlined text-[18px]">add</span><span>Agregar tarjeta</span>
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <thead>
+          <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+            <th class="px-stack-md py-4 font-semibold">Concepto</th>
+            <th class="px-stack-md py-4 font-semibold">Menú</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Cantidad</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Valor</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Subtotal</th>
+            <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for t in evento.tarjetas.all %}
+          <tr class="hover:bg-[#1C1C1C] transition-colors">
+            <td class="px-stack-md py-4 text-on-surface-high">{{ t.concepto }}</td>
+            <td class="px-stack-md py-4 text-on-surface-med">
+              {% if t.menu %}<a data-modal-link href="{% url 'stock:menu_detail' t.menu.pk %}" class="text-primary hover:underline">{{ t.menu.nombre }}</a>{% else %}—{% endif %}
+            </td>
+            <td class="px-stack-md py-4 text-right text-on-surface-med">{{ t.cantidad }}</td>
+            <td class="px-stack-md py-4 text-right text-on-surface-med">$ {{ t.valor_unitario|floatformat:2 }}</td>
+            <td class="px-stack-md py-4 text-right text-primary font-semibold">$ {{ t.subtotal|floatformat:2 }}</td>
+            <td class="px-stack-md py-4 text-right whitespace-nowrap">
+              <a data-modal-link href="{% url 'stock:tarjetaevento_update' t.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+              <a data-modal-link href="{% url 'stock:tarjetaevento_delete' t.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="px-stack-md py-16 text-center">
+              <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">confirmation_number</span>
+              <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay tarjetas cargadas.</p>
+              <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Ej. "Adultos, 80, $50.000" y "Menú infantil, 20, $30.000".</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex flex-wrap justify-between gap-stack-sm items-center text-on-surface-med font-body-sm text-body-sm">
+      <span>{{ evento.tarjetas.all|length }} tarjeta{{ evento.tarjetas.all|length|pluralize }}</span>
+      <span>Total tarjetas: <span class="text-primary font-semibold">$ {{ evento.ingreso_tarjetas|floatformat:2 }}</span></span>
+    </div>
+  </div>
+
+  {% with diferencia=evento.tarjetas_vs_asistentes %}
+  {% if diferencia %}
+  <div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-xl px-stack-md py-stack-sm">
+    <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">info</span>
+    <p class="font-body-sm text-body-sm text-on-surface-med">
+      Las tarjetas suman <strong class="text-on-surface">{{ diferencia|add:evento.asistentes }}</strong> personas
+      y el evento tiene <strong class="text-on-surface">{{ evento.asistentes|default:0 }}</strong> asistentes cargados.
+      No es un error necesariamente — los números bailan hasta último momento — pero conviene mirarlo.
+    </p>
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  {% if evento.ingreso_brindis %}
+  <div class="flex flex-wrap items-center justify-between gap-stack-sm bg-surface-raised border border-surface-overlay rounded-xl px-stack-lg py-stack-md">
+    <span class="font-body-md text-body-md text-on-surface flex items-center gap-stack-sm">
+      <span class="material-symbols-outlined text-[20px] text-primary">local_bar</span>
+      Brindis · {{ evento.brindis_asistentes }} persona{{ evento.brindis_asistentes|pluralize }} × $ {{ evento.brindis_valor|floatformat:2 }}
+    </span>
+    <span class="text-primary font-semibold">$ {{ evento.ingreso_brindis|floatformat:2 }}</span>
+  </div>
+  {% endif %}
+</section>
+
 <!-- ===================== Cargos al cliente ===================== -->
 <section class="flex flex-col gap-stack-md w-full">
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-sm">
@@ -325,41 +414,79 @@
 
 <!-- ===================== Resultado ===================== -->
 {% if evento.tiene_precio_cargado %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<section class="flex flex-col gap-stack-md">
+  <h2 class="font-headline-sm text-headline-sm text-on-surface-high">Resultado del evento</h2>
 
-  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
-    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Facturado</p>
-    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ evento.ingreso_total|floatformat:2 }}</p>
-    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
-      {% if evento.precio_cerrado is not None %}Precio cerrado{% else %}{{ evento.asistentes|default:0 }} × $ {{ evento.precio_por_persona|floatformat:2 }}{% endif %}
-      {% if evento.ingreso_cargos %} + adicionales{% endif %}
-    </p>
+  {% comment %}
+  El desglose va abierto a propósito. El dueño pidió que TODO sume y nada pise a nada
+  (RN-17), así que cargar las tarjetas y además el precio por persona factura la misma
+  plata dos veces. Con un total pelado eso no se ve nunca; con cada renglón a la vista, sí.
+  {% endcomment %}
+  <div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+    <div class="overflow-x-auto w-full">
+      <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+        <tbody class="divide-y divide-surface-overlay text-on-surface">
+          {% for renglon in evento.desglose_ingresos %}
+          <tr>
+            <td class="px-stack-lg py-3 text-on-surface">{{ renglon.concepto }}</td>
+            <td class="px-stack-md py-3 text-on-surface-med">{{ renglon.detalle }}</td>
+            <td class="px-stack-lg py-3 text-right text-on-surface-high">$ {{ renglon.monto|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+
+          <tr class="bg-surface-container">
+            <td class="px-stack-lg py-3 font-semibold text-on-surface-high" colspan="2">Facturado</td>
+            <td class="px-stack-lg py-3 text-right font-semibold text-on-surface-high">$ {{ evento.ingreso_total|floatformat:2 }}</td>
+          </tr>
+
+          <tr>
+            <td class="px-stack-lg py-3 text-error" colspan="2">− Gasto de stock</td>
+            <td class="px-stack-lg py-3 text-right text-error">$ {{ gs|floatformat:2 }}</td>
+          </tr>
+          <tr>
+            <td class="px-stack-lg py-3 text-error" colspan="2">− Gasto de personal</td>
+            <td class="px-stack-lg py-3 text-right text-error">$ {{ gp|floatformat:2 }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
-    <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Costo total</p>
-    <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ evento.gasto_total|floatformat:2 }}</p>
-  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+    <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+      <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Facturado</p>
+      <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ evento.ingreso_total|floatformat:2 }}</p>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Tarjetas, brindis, paquete y adicionales</p>
+    </div>
 
-  {% with m=evento.margen %}
-  <div class="bg-surface-raised rounded-xl p-stack-lg border {% if m < 0 %}border-error/50{% else %}border-primary/40{% endif %}">
-    <p class="font-label-md text-label-md uppercase tracking-wider {% if m < 0 %}text-error{% else %}text-primary{% endif %}">
-      {% if m < 0 %}Pérdida{% else %}Ganancia{% endif %}
-    </p>
-    <p class="font-display-lg text-[32px] leading-10 font-semibold mt-stack-sm {% if m < 0 %}text-error{% else %}text-primary{% endif %}">$ {{ m|floatformat:2 }}</p>
-    {% if evento.margen_porcentaje is not None %}
-    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">{{ evento.margen_porcentaje|floatformat:1 }} % de lo facturado</p>
-    {% endif %}
-  </div>
-  {% endwith %}
+    <div class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+      <p class="font-label-md text-label-md text-primary uppercase tracking-wider">Costo total</p>
+      <p class="font-display-lg text-[32px] leading-10 font-semibold text-on-surface-high mt-stack-sm">$ {{ evento.gasto_total|floatformat:2 }}</p>
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Stock consumido y personal</p>
+    </div>
 
-</div>
+    {% with m=evento.margen %}
+    <div class="bg-surface-raised rounded-xl p-stack-lg border {% if m < 0 %}border-error/50{% else %}border-primary/40{% endif %}">
+      <p class="font-label-md text-label-md uppercase tracking-wider {% if m < 0 %}text-error{% else %}text-primary{% endif %}">
+        {% if m < 0 %}Pérdida{% else %}Ganancia{% endif %}
+      </p>
+      <p class="font-display-lg text-[32px] leading-10 font-semibold mt-stack-sm {% if m < 0 %}text-error{% else %}text-primary{% endif %}">$ {{ m|floatformat:2 }}</p>
+      {% if evento.margen_porcentaje is not None %}
+      <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">{{ evento.margen_porcentaje|floatformat:1 }} % de lo facturado</p>
+      {% endif %}
+    </div>
+    {% endwith %}
+  </div>
+</section>
 {% else %}
 <div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-xl px-stack-md py-stack-sm">
   <span class="material-symbols-outlined text-[20px] text-on-surface-med shrink-0 mt-[2px]">payments</span>
   <div>
-    <p class="font-body-md text-body-md text-on-surface">Este evento no tiene precio cargado, así que no se puede calcular la ganancia.</p>
-    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Cargá el precio por persona o el precio cerrado desde <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" class="text-primary hover:underline">editar evento</a>.</p>
+    <p class="font-body-md text-body-md text-on-surface">Este evento no tiene nada facturado cargado, así que no se puede calcular la ganancia.</p>
+    <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">
+      Cargá las <a data-modal-link href="{% url 'stock:tarjetaevento_create' evento.pk %}" class="text-primary hover:underline">tarjetas</a>
+      (lo que paga cada invitado), o un precio desde <a data-modal-link href="{% url 'stock:evento_update' evento.pk %}" class="text-primary hover:underline">editar evento</a>.
+    </p>
   </div>
 </div>
 {% endif %}

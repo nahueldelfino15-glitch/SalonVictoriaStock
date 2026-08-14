@@ -30,6 +30,10 @@ urlpatterns = [
     path('eventos/<int:pk>/eliminar/', views.EventoDeleteView.as_view(), name='evento_delete'),
     path('eventos/<int:pk>/reabrir/', views.reabrir_evento, name='evento_reabrir'),
 
+    path('eventos/<int:evento_pk>/tarjetas/nueva/', views.TarjetaEventoCreateView.as_view(), name='tarjetaevento_create'),
+    path('tarjetas/<int:pk>/editar/', views.TarjetaEventoUpdateView.as_view(), name='tarjetaevento_update'),
+    path('tarjetas/<int:pk>/eliminar/', views.TarjetaEventoDeleteView.as_view(), name='tarjetaevento_delete'),
+
     path('eventos/<int:evento_pk>/cargos/nuevo/', views.CargoEventoCreateView.as_view(), name='cargoevento_create'),
     path('cargos/<int:pk>/editar/', views.CargoEventoUpdateView.as_view(), name='cargoevento_update'),
     path('cargos/<int:pk>/eliminar/', views.CargoEventoDeleteView.as_view(), name='cargoevento_delete'),
@@ -50,6 +54,11 @@ urlpatterns = [
     path('empleados/<int:pk>/editar/', views.EmpleadoUpdateView.as_view(), name='empleado_update'),
     path('empleados/<int:pk>/eliminar/', views.EmpleadoDeleteView.as_view(), name='empleado_delete'),
 
+    path('destinatarios/', views.DestinatarioAvisoListView.as_view(), name='destinatario_list'),
+    path('destinatarios/nuevo/', views.DestinatarioAvisoCreateView.as_view(), name='destinatario_create'),
+    path('destinatarios/<int:pk>/editar/', views.DestinatarioAvisoUpdateView.as_view(), name='destinatario_update'),
+    path('destinatarios/<int:pk>/eliminar/', views.DestinatarioAvisoDeleteView.as_view(), name='destinatario_delete'),
+
     path('puestos/', views.PuestoListView.as_view(), name='puesto_list'),
     path('puestos/nuevo/', views.PuestoCreateView.as_view(), name='puesto_create'),
     path('puestos/<int:pk>/editar/', views.PuestoUpdateView.as_view(), name='puesto_update'),
@@ -60,6 +69,7 @@ urlpatterns = [
     path('personal-evento/<int:pk>/eliminar/', views.PersonalEventoDeleteView.as_view(), name='personalevento_delete'),
 
     path('eventos/historial/', views.EventoHistorialListView.as_view(), name='evento_historial'),
+    path('movimientos/', views.MovimientoStockListView.as_view(), name='movimiento_list'),
     path('eventos/<int:evento_pk>/consumo/nuevo/', views.MovimientoStockCreateView.as_view(), name='movimientostock_create'),
     path('consumo/<int:pk>/editar/', views.MovimientoStockUpdateView.as_view(), name='movimientostock_update'),
     path('consumo/<int:pk>/eliminar/', views.MovimientoStockDeleteView.as_view(), name='movimientostock_delete'),
@@ -82,4 +92,11 @@ urlpatterns = [
 
     path('consumo/', views.consumo_selector, name='consumo_selector'),
     path('consumo/<int:evento_pk>/', views.consumo_evento, name='consumo_evento'),
+
+    # Quién entra al sistema y con qué rol. Solo el administrador (RN-24).
+    path('usuarios/', views.UsuarioListView.as_view(), name='usuario_list'),
+    path('usuarios/nuevo/', views.UsuarioCreateView.as_view(), name='usuario_create'),
+    path('usuarios/<int:pk>/editar/', views.UsuarioUpdateView.as_view(), name='usuario_update'),
+    path('usuarios/<int:pk>/contrasena/', views.UsuarioPasswordView.as_view(), name='usuario_password'),
+    path('usuarios/<int:pk>/eliminar/', views.UsuarioDeleteView.as_view(), name='usuario_delete'),
 ]

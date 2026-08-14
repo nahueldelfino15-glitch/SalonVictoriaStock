@@ -1,0 +1,209 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<!-- ============================ Encabezado ============================ -->
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-stack-md w-full">
+  <div>
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">Historial de movimientos</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      Todo lo que entró, salió o se perdió, con su fecha. Es el libro mayor del stock:
+      cada línea explica por qué el stock de un producto es el que es.
+    </p>
+  </div>
+  <div class="flex items-center gap-stack-sm text-on-surface-med font-body-sm text-body-sm shrink-0">
+    <span class="material-symbols-outlined text-[20px] text-primary">receipt_long</span>
+    <span>{{ total_movimientos }} movimiento{{ total_movimientos|pluralize }}</span>
+  </div>
+</header>
+
+<!-- ============================ Filtros ============================ -->
+<form method="get" class="bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg flex flex-col gap-stack-md">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-stack-md">
+
+    <div class="flex flex-col gap-unit xl:col-span-2">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="f-q">Producto</label>
+      <input type="text" name="q" id="f-q" value="{{ filtros.q|default:'' }}" placeholder="Buscar producto..."
+             class="w-full font-body-sm text-body-sm">
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="f-tipo">Tipo</label>
+      <select name="tipo" id="f-tipo" class="w-full font-body-sm text-body-sm">
+        <option value="">Todos</option>
+        {% for valor, etiqueta in tipos %}
+        <option value="{{ valor }}" {% if filtros.tipo == valor %}selected{% endif %}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="f-sector">Sector</label>
+      <select name="sector" id="f-sector" class="w-full font-body-sm text-body-sm">
+        <option value="">Todos</option>
+        {% for valor, etiqueta in sectores %}
+        <option value="{{ valor }}" {% if filtros.sector == valor %}selected{% endif %}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="f-desde">Desde</label>
+      <input type="date" name="desde" id="f-desde" value="{{ filtros.desde|default:'' }}" class="w-full font-body-sm text-body-sm">
+    </div>
+
+    <div class="flex flex-col gap-unit">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="f-hasta">Hasta</label>
+      <input type="date" name="hasta" id="f-hasta" value="{{ filtros.hasta|default:'' }}" class="w-full font-body-sm text-body-sm">
+    </div>
+  </div>
+
+  <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-stack-md pt-stack-md border-t border-surface-variant">
+    <div class="flex flex-col gap-unit w-full sm:max-w-xs">
+      <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="f-evento">Evento</label>
+      <select name="evento" id="f-evento" class="w-full font-body-sm text-body-sm">
+        <option value="">Todos</option>
+        {% for e in eventos %}
+        <option value="{{ e.pk }}" {% if filtros.evento == e.pk|stringformat:"s" %}selected{% endif %}>{{ e.nombre }} · {{ e.fecha|date:"d/m/Y" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="flex gap-stack-md">
+      {% if hay_filtros %}
+      <a href="{% url 'stock:movimiento_list' %}"
+         class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded whitespace-nowrap">
+        <span class="material-symbols-outlined text-[18px]">filter_alt_off</span><span>Limpiar</span>
+      </a>
+      {% endif %}
+      <button type="submit"
+              class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded whitespace-nowrap active:scale-95">
+        <span class="material-symbols-outlined text-[18px]">search</span><span>Filtrar</span>
+      </button>
+    </div>
+  </div>
+</form>
+
+<!-- ============================ Tabla ============================ -->
+<div class="bg-surface-raised rounded-xl border border-surface-overlay overflow-hidden">
+  <div class="overflow-x-auto w-full">
+    <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
+      <thead>
+        <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          <th class="px-stack-md py-4 font-semibold">Fecha</th>
+          <th class="px-stack-md py-4 font-semibold">Producto</th>
+          <th class="px-stack-md py-4 font-semibold">Movimiento</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Cantidad</th>
+          <th class="px-stack-md py-4 font-semibold">Motivo / Evento</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Valorizado</th>
+          <th class="px-stack-md py-4 font-semibold text-right">Acciones</th>
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-surface-overlay text-on-surface">
+        {% for m in movimientos %}
+        <tr class="hover:bg-[#1C1C1C] transition-colors group">
+          <td class="px-stack-md py-4 text-on-surface-med">
+            {{ m.fecha|date:"d/m/Y" }}
+            <span class="text-on-surface-med/60">{{ m.fecha|date:"H:i" }}</span>
+          </td>
+
+          <td class="px-stack-md py-4">
+            <span class="text-on-surface-high group-hover:text-primary transition-colors">{{ m.producto.nombre }}</span>
+            <span class="block font-label-md text-[10px] uppercase tracking-wider text-on-surface-med">{{ m.producto.get_sector_display }}</span>
+          </td>
+
+          <td class="px-stack-md py-4">
+            {% if m.tipo == 'entrada' %}
+            <span class="inline-flex items-center gap-unit border border-primary/40 bg-primary/10 text-primary px-2 py-[2px] rounded-pill font-label-md text-[10px] uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[14px]">arrow_downward</span>Entrada
+            </span>
+            {% elif m.tipo == 'salida' %}
+            <span class="inline-flex items-center gap-unit border border-outline-variant bg-surface-base text-on-surface-variant px-2 py-[2px] rounded-pill font-label-md text-[10px] uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[14px]">arrow_upward</span>Salida
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-unit border border-error/50 bg-error/10 text-error px-2 py-[2px] rounded-pill font-label-md text-[10px] uppercase tracking-wider">
+              <span class="material-symbols-outlined text-[14px]">delete_sweep</span>Merma
+            </span>
+            {% endif %}
+          </td>
+
+          <td class="px-stack-md py-4 text-right {% if m.tipo == 'entrada' %}text-primary{% else %}text-on-surface{% endif %}">
+            {% if m.tipo == 'entrada' %}+{% else %}−{% endif %}{{ m.cantidad }} {{ m.producto.unidad_medida }}
+          </td>
+
+          <td class="px-stack-md py-4 text-on-surface-med">
+            {% if m.evento %}
+            <a data-modal-link href="{% url 'stock:evento_detail' m.evento.pk %}" class="text-primary hover:underline">{{ m.evento.nombre }}</a>
+            {% elif m.motivo %}
+            {{ m.get_motivo_display }}
+            {% elif m.tipo == 'entrada' %}
+            Reposición de depósito
+            {% else %}
+            —
+            {% endif %}
+          </td>
+
+          <td class="px-stack-md py-4 text-right text-on-surface-med">
+            {% if m.costo_unitario %}
+            $ {{ m.costo_unitario|floatformat:2 }}
+            <span class="block text-[10px] text-on-surface-med/60">unitario del momento</span>
+            {% else %}
+            —
+            {% endif %}
+          </td>
+
+          <td class="px-stack-md py-4 text-right whitespace-nowrap">
+            <a data-modal-link href="{% url 'stock:movimientostock_update' m.pk %}" aria-label="Editar" title="Editar" class="inline-flex text-on-surface-med hover:text-primary transition-colors p-1 rounded"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+            <a data-modal-link href="{% url 'stock:movimientostock_delete' m.pk %}" aria-label="Eliminar" title="Eliminar" class="inline-flex text-on-surface-med hover:text-error transition-colors p-1 rounded ml-2"><span class="material-symbols-outlined text-[20px]">delete</span></a>
+          </td>
+        </tr>
+
+        {% empty %}
+        <tr>
+          <td colspan="7" class="px-stack-md py-16 text-center">
+            <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">receipt_long</span>
+            {% if hay_filtros %}
+            <p class="font-body-md text-body-md text-on-surface-med">No hay movimientos que cumplan con ese filtro.</p>
+            <a href="{% url 'stock:movimiento_list' %}" class="inline-block mt-stack-sm text-primary hover:underline font-body-sm text-body-sm">Ver todos</a>
+            {% else %}
+            <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay movimientos de stock.</p>
+            <p class="font-body-sm text-body-sm text-on-surface-med mt-unit">Se cargan desde Compras, Consumo y Merma.</p>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================ Paginado ============================ -->
+  <div class="px-stack-md py-4 border-t border-surface-overlay bg-surface-container flex flex-wrap justify-between items-center gap-stack-sm text-on-surface-med font-body-sm text-body-sm">
+    <span>
+      {% if is_paginated %}Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} · {% endif %}{{ total_movimientos }} movimiento{{ total_movimientos|pluralize }}
+    </span>
+
+    {% if is_paginated %}
+    {% comment %}
+    Los filtros se arrastran al cambiar de página: sin esto, pasar a la página 2
+    devuelve el listado entero y el usuario cree que el filtro se rompió.
+    {% endcomment %}
+    <div class="flex gap-stack-sm">
+      {% if page_obj.has_previous %}
+      <a href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.tipo %}tipo={{ filtros.tipo|urlencode }}&{% endif %}{% if filtros.sector %}sector={{ filtros.sector|urlencode }}&{% endif %}{% if filtros.evento %}evento={{ filtros.evento|urlencode }}&{% endif %}{% if filtros.desde %}desde={{ filtros.desde|urlencode }}&{% endif %}{% if filtros.hasta %}hasta={{ filtros.hasta|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}"
+         class="inline-flex items-center gap-unit hover:text-primary transition-colors">
+        <span class="material-symbols-outlined text-[18px]">chevron_left</span>Anterior
+      </a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a href="?{% if filtros.q %}q={{ filtros.q|urlencode }}&{% endif %}{% if filtros.tipo %}tipo={{ filtros.tipo|urlencode }}&{% endif %}{% if filtros.sector %}sector={{ filtros.sector|urlencode }}&{% endif %}{% if filtros.evento %}evento={{ filtros.evento|urlencode }}&{% endif %}{% if filtros.desde %}desde={{ filtros.desde|urlencode }}&{% endif %}{% if filtros.hasta %}hasta={{ filtros.hasta|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}"
+         class="inline-flex items-center gap-unit hover:text-primary transition-colors">
+        Siguiente<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

@@ -3,9 +3,13 @@
     <table class="w-full text-left font-body-sm text-body-sm whitespace-nowrap">
       <thead>
         <tr class="border-b border-surface-overlay bg-surface-container text-primary font-label-md text-label-md uppercase tracking-wider">
+          {% comment %}
+          `sin_precio` va en negativo a propósito: si un include se olvidara de pasarlo,
+          la columna se muestra (lo de siempre) en vez de desaparecer sin que nadie note.
+          {% endcomment %}
           <th class="px-stack-md py-4 font-semibold">Producto</th>
           <th class="px-stack-md py-4 font-semibold">Cantidad actual</th>
-          <th class="px-stack-md py-4 font-semibold">Precio compra</th>
+          {% if not sin_precio %}<th class="px-stack-md py-4 font-semibold">Precio compra</th>{% endif %}
           <th class="px-stack-md py-4 font-semibold text-right">Agregar stock</th>
         </tr>
       </thead>
@@ -14,7 +18,7 @@
         <tr class="hover:bg-[#1C1C1C] transition-colors group">
           <td class="px-stack-md py-4 text-on-surface">{{ producto.nombre }}</td>
           <td class="px-stack-md py-4 text-on-surface-med">{{ producto.stock_actual }} {{ producto.unidad_medida }}</td>
-          <td class="px-stack-md py-4 text-on-surface-med">${{ producto.precio_unitario }}</td>
+          {% if not sin_precio %}<td class="px-stack-md py-4 text-on-surface-med">${{ producto.precio_unitario }}</td>{% endif %}
           <td class="px-stack-md py-4 text-right">
             <form method="post" action="{% url 'stock:compras' %}" class="flex items-center justify-end gap-stack-sm">
               {% csrf_token %}
@@ -32,7 +36,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="4" class="px-stack-md py-16 text-center">
+          <td colspan="{% if sin_precio %}3{% else %}4{% endif %}" class="px-stack-md py-16 text-center">
             <span class="material-symbols-outlined text-[40px] text-outline-variant block mb-stack-sm">inbox</span>
             <p class="font-body-md text-body-md text-on-surface-med">Todavía no hay productos cargados en este sector.</p>
           </td>

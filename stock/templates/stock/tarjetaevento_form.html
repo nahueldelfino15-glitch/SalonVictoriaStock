@@ -1,0 +1,56 @@
+{% extends base_template|default:'stock/base.html' %}
+{% block content %}
+
+<div class="w-full max-w-2xl mx-auto bg-surface-raised border border-surface-overlay rounded-xl p-stack-lg">
+
+  <div class="mb-stack-lg">
+    <h1 class="font-headline-lg text-headline-lg text-on-surface-high">{% if object %}Editar tarjeta{% else %}Nueva tarjeta{% endif %}</h1>
+    <p class="font-body-md text-body-md text-on-surface-med mt-unit">
+      Un tipo de invitado de <strong class="text-on-surface-high">{{ evento.nombre }}</strong>:
+      cuántos son y cuánto paga cada uno. Ej. <em>Adultos, 80, $50.000</em>.
+    </p>
+  </div>
+
+  <form method="post" class="flex flex-col gap-stack-lg [&_input]:w-full [&_select]:w-full">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% firstof request.POST.next request.GET.next '' %}">
+
+    {% if form.non_field_errors %}
+    <div class="flex flex-col gap-unit border border-error/50 bg-error/10 rounded-lg px-stack-md py-stack-sm">
+      {% for error in form.non_field_errors %}
+      <p class="font-body-sm text-body-sm text-error flex items-start gap-stack-sm">
+        <span class="material-symbols-outlined text-[18px] shrink-0 mt-[2px]">error</span><span>{{ error }}</span>
+      </p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+      {% for field in form %}
+      <div class="flex flex-col gap-unit">
+        <label class="font-label-md text-label-md text-primary uppercase tracking-wider" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="font-body-sm text-body-sm text-on-surface-med">{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<p class="font-body-sm text-body-sm text-error">{{ field.errors|striptags }}</p>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex items-start gap-stack-sm border border-outline-variant bg-surface-base rounded-lg px-stack-md py-stack-sm">
+      <span class="material-symbols-outlined text-[18px] text-primary shrink-0 mt-[2px]">restaurant_menu</span>
+      <p class="font-body-sm text-body-sm text-on-surface-med">
+        Si le asignás un menú, la receta se calcula para <strong class="text-on-surface">esta cantidad</strong> de
+        personas. Así una fiesta con 80 menús de adulto y 20 infantiles pide la comida de cada uno por separado.
+      </p>
+    </div>
+
+    <div class="flex justify-end gap-stack-md pt-stack-md border-t border-surface-variant">
+      <a {% if es_modal %}data-modal-close{% endif %} href="{% url 'stock:evento_detail' evento.pk %}"
+         class="inline-flex items-center justify-center gap-unit luxury-button-secondary font-label-md text-label-md uppercase tracking-wider px-stack-lg py-stack-sm rounded">Cancelar</a>
+      <button type="submit" class="inline-flex items-center justify-center gap-unit luxury-button-primary font-label-md text-label-md uppercase tracking-wider font-bold px-stack-lg py-stack-sm rounded active:scale-95"><span>Guardar</span><span class="material-symbols-outlined text-[18px]">check</span></button>
+    </div>
+  </form>
+
+</div>
+
+{% endblock %}

@@ -2,7 +2,11 @@ import calendar
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.forms import SetPasswordForm, UserCreationForm
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import ProtectedError
@@ -13,7 +17,9 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, U
 
 from .models import (
     SECTOR_CHOICES,
+    sector_valoriza,
     CargoEvento,
+    DestinatarioAviso,
     Empleado,
     Evento,
     LineaReceta,
@@ -24,6 +30,7 @@ from .models import (
     Plato,
     Producto,
     Puesto,
+    TarjetaEvento,
 )
 
 
@@ -49,6 +56,48 @@ def parsear_cantidad(valor):
     if not cantidad.is_finite() or cantidad > CANTIDAD_MAXIMA:
         return None
     return cantidad
+
+
+def parsear_fecha(valor):
+    """'2026-08-13' -> date, o None si no es una fecha.
+
+    Los filtros vienen de la querystring, que la escribe cualquiera: pasarle
+    texto suelto a un lookup __date es un 500, no una lista vacía. Mismo motivo
+    que parsear_cantidad().
+    """
+    try:
+        return date.fromisoformat(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def parsear_entero(valor):
+    """Lo que llegó por la URL -> int, o None si no es un número."""
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+# ---------- Roles: quién ve qué (RN-24) ----------
+class SoloAdminMixin(UserPassesTestMixin):
+    """Cuelga esto de una vista y la ve solo el administrador.
+
+    El rol vive en `User.is_staff`, que Django ya trae: dos roles son un
+    booleano, no una tabla nueva con su FK y su migración. De yapa, ese mismo
+    flag es el que cierra /admin/, así que el empleado queda afuera de las dos
+    puertas con una sola marca.
+    """
+
+    def test_func(self):
+        return self.request.user.is_staff
+
+    def handle_no_permission(self):
+        # Un 403 pelado no le dice nada a nadie. La sesión ya existe (la exige
+        # LoginRequiredMiddleware), así que lo único que cae acá es un empleado
+        # tocando una URL que no le toca.
+        messages.error(self.request, 'Esa pantalla es solo para administradores.')
+        return redirect('stock:home')
+
 
 def home(request):
     year = request.GET.get('year')
@@ -76,8 +125,16 @@ class ProductoListView(ListView):
         ver_bajas = bool(self.request.GET.get('bajas'))
 
         productos = Producto.objects.filter(nombre__icontains=q, activo=not ver_bajas)
-        for sector, _ in SECTOR_CHOICES:
-            context[f'productos_{sector}'] = productos.filter(sector=sector).order_by(Lower('nombre'))
+        context['sectores'] = []
+        for clave, etiqueta in SECTOR_CHOICES:
+            del_sector = productos.filter(sector=clave).order_by(Lower('nombre'))
+            context[f'productos_{clave}'] = del_sector
+            context['sectores'].append({
+                'clave': clave,
+                'etiqueta': etiqueta,
+                'productos': del_sector,
+                'sin_precio': not sector_valoriza(clave),
+            })
 
         context['q'] = q
         context['ver_bajas'] = ver_bajas
@@ -101,6 +158,7 @@ class ProductoCreateView(CreateView):
         # Opcional: en blanco queda en 0.
         form.fields['stock_actual'].required = False
         form.fields['stock_actual'].label = 'Stock inicial'
+        preparar_precio(form)
         return form
 
     @transaction.atomic
@@ -129,6 +187,24 @@ class ProductoUpdateView(UpdateView):
     fields = ['nombre', 'sector', 'precio_unitario', 'unidad_medida']
     template_name = 'stock/producto_form.html'
     success_url = reverse_lazy('stock:producto_list')
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        preparar_precio(form)
+        return form
+
+
+def preparar_precio(form):
+    """El precio es opcional: el mobiliario se cuenta pero no se valoriza (RN-8).
+
+    No se esconde el campo según el sector porque eso pide JS, y los <script> que
+    entran por innerHTML no se ejecutan dentro de un modal (RN-22): sería un campo
+    que desaparece en la pantalla suelta y queda a la vista en el modal. Un campo
+    opcional bien explicado es más honesto que uno que a veces está.
+    """
+    campo = form.fields['precio_unitario']
+    campo.required = False
+    campo.help_text = 'Dejalo vacío para lo que solo se cuenta (mobiliario: vajilla, manteles, vasos).'
 
 
 class ProductoDeleteView(DeleteView):
@@ -212,7 +288,9 @@ class EventoDetailView(DetailView):
 
 CAMPOS_EVENTO = [
     'nombre', 'fecha', 'asistentes', 'estado', 'paquete', 'menu',
-    'precio_por_persona', 'precio_cerrado', 'telefono_contacto', 'notas',
+    'precio_por_persona', 'precio_cerrado', 'precio_paquete',
+    'brindis_asistentes', 'brindis_valor',
+    'telefono_contacto', 'notas',
 ]
 
 
@@ -384,6 +462,41 @@ class PuestoDeleteView(DeleteView):
             return redirect(self.success_url)
 
 
+# ---------- Destinatarios de los avisos por mail ----------
+class DestinatarioAvisoListView(ListView):
+    model = DestinatarioAviso
+    template_name = 'stock/destinatario_list.html'
+    context_object_name = 'destinatarios'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['dias_aviso'] = getattr(settings, 'DIAS_AVISO_EVENTO', 7)
+        # Sin SMTP configurado los mails salen por la terminal y nadie los recibe:
+        # más vale decirlo en la pantalla que dejar que se descubra solo.
+        context['manda_de_verdad'] = 'smtp' in getattr(settings, 'EMAIL_BACKEND', '').lower()
+        return context
+
+
+class DestinatarioAvisoCreateView(CreateView):
+    model = DestinatarioAviso
+    fields = ['email', 'nombre', 'activo']
+    template_name = 'stock/destinatario_form.html'
+    success_url = reverse_lazy('stock:destinatario_list')
+
+
+class DestinatarioAvisoUpdateView(UpdateView):
+    model = DestinatarioAviso
+    fields = ['email', 'nombre', 'activo']
+    template_name = 'stock/destinatario_form.html'
+    success_url = reverse_lazy('stock:destinatario_list')
+
+
+class DestinatarioAvisoDeleteView(DeleteView):
+    model = DestinatarioAviso
+    template_name = 'stock/destinatario_confirm_delete.html'
+    success_url = reverse_lazy('stock:destinatario_list')
+
+
 # ---------- Recetas: platos y sus ingredientes ----------
 class PlatoCreateView(CreateView):
     """Un paso de la comida dentro de un menú (entrante, principal, postre…)."""
@@ -536,6 +649,69 @@ def copiar_receta(request, pk):
     return redirect(destino)
 
 
+# ---------- Tarjetas (lo que paga cada tipo de invitado) ----------
+class TarjetaEventoCreateView(CreateView):
+    model = TarjetaEvento
+    fields = ['concepto', 'cantidad', 'valor_unitario', 'menu']
+    template_name = 'stock/tarjetaevento_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.evento = get_object_or_404(Evento, pk=self.kwargs['evento_pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # El evento antes de validar, para que clean() pueda bloquear si está cerrado (RN-16).
+        kwargs['instance'] = TarjetaEvento(evento=self.evento)
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.evento = self.evento
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        next_url = self.request.POST.get('next') or reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+        for errores_del_campo in form.errors.values():
+            for error in errores_del_campo:
+                messages.error(self.request, error)
+        return redirect(next_url)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.evento
+        return context
+
+    def get_success_url(self):
+        return self.request.POST.get('next') or reverse('stock:evento_detail', kwargs={'pk': self.evento.pk})
+
+
+class TarjetaEventoUpdateView(UpdateView):
+    model = TarjetaEvento
+    fields = ['concepto', 'cantidad', 'valor_unitario', 'menu']
+    template_name = 'stock/tarjetaevento_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.object.evento
+        return context
+
+    def get_success_url(self):
+        return reverse('stock:evento_detail', kwargs={'pk': self.object.evento_id})
+
+
+class TarjetaEventoDeleteView(DeleteView):
+    model = TarjetaEvento
+    template_name = 'stock/tarjetaevento_confirm_delete.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['evento'] = self.object.evento
+        return context
+
+    def get_success_url(self):
+        return reverse('stock:evento_detail', kwargs={'pk': self.object.evento_id})
+
+
 # ---------- Cargos al cliente (adicionales facturables) ----------
 class CargoEventoCreateView(CreateView):
     model = CargoEvento
@@ -658,6 +834,68 @@ class MovimientoStockCreateView(MovimientoStockEnEventoMixin, CreateView):
         return reverse_lazy('stock:evento_detail', kwargs={'pk': self.evento.pk})
 
 
+class MovimientoStockListView(ListView):
+    """El libro mayor completo: qué se movió, cuándo, cuánto y por qué.
+
+    Hasta ahora los movimientos solo se veían colgados de su evento o de la
+    pantalla donde se cargaron, así que no había forma de responder "¿qué entró
+    la semana pasada?" sin entrar al admin.
+    """
+
+    model = MovimientoStock
+    template_name = 'stock/movimiento_list.html'
+    context_object_name = 'movimientos'
+    paginate_by = 50
+
+    def get_queryset(self):
+        queryset = (
+            MovimientoStock.objects
+            .select_related('producto', 'evento')
+            .order_by('-fecha', '-pk')
+        )
+
+        # Todo lo que entra por la URL se sanea antes de tocar la base: un
+        # ?desde=cualquiercosa o un ?evento=abc son un 500, no una lista vacía.
+        filtros = self.request.GET
+
+        if filtros.get('tipo'):
+            queryset = queryset.filter(tipo=filtros['tipo'])
+        if filtros.get('sector'):
+            queryset = queryset.filter(producto__sector=filtros['sector'])
+        if filtros.get('q'):
+            queryset = queryset.filter(producto__nombre__icontains=filtros['q'])
+
+        evento = parsear_entero(filtros.get('evento'))
+        if evento is not None:
+            queryset = queryset.filter(evento_id=evento)
+
+        # Las fechas se filtran por día: `fecha` es un DateTimeField, así que un
+        # `desde=hoy` sin __date dejaría afuera todo lo cargado hoy después de las 00:00.
+        desde = parsear_fecha(filtros.get('desde'))
+        if desde is not None:
+            queryset = queryset.filter(fecha__date__gte=desde)
+        hasta = parsear_fecha(filtros.get('hasta'))
+        if hasta is not None:
+            queryset = queryset.filter(fecha__date__lte=hasta)
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['sectores'] = SECTOR_CHOICES
+        context['tipos'] = MovimientoStock.TIPO_CHOICES
+        context['eventos'] = Evento.objects.order_by('-fecha')
+        context['filtros'] = self.request.GET
+        context['hay_filtros'] = any(
+            self.request.GET.get(campo)
+            for campo in ('tipo', 'sector', 'q', 'evento', 'desde', 'hasta')
+        )
+        # Sobre el queryset filtrado entero, no sobre la página: el total de una
+        # página suelta no le dice nada a nadie.
+        context['total_movimientos'] = self.get_queryset().count()
+        return context
+
+
 def volver_del_movimiento(movimiento):
     """A dónde se vuelve después de editar o borrar un movimiento.
 
@@ -761,15 +999,26 @@ class MenuDeleteView(DeleteView):
 # ---------- Compras y merma (movimientos de depósito, por sector) ----------
 
 def productos_por_sector():
-    """Los tres sectores de RN-8, que comparten Compras, Consumo y Merma.
+    """Los sectores de RN-8, que comparten Productos, Compras, Consumo y Merma.
+
+    Devuelve la lista `sectores` para que los templates la recorran: agregar un
+    sector no puede obligar a tocar cuatro pantallas a mano. Las claves sueltas
+    (`productos_barra`, …) quedan porque varias pantallas las usan por nombre.
 
     Solo los activos: un producto dado de baja conserva su historial pero no se
     puede seguir moviendo (RN-20).
     """
-    return {
-        f'productos_{sector}': Producto.objects.filter(sector=sector, activo=True).order_by(Lower('nombre'))
-        for sector, _ in SECTOR_CHOICES
-    }
+    contexto = {'sectores': []}
+    for clave, etiqueta in SECTOR_CHOICES:
+        productos = Producto.objects.filter(sector=clave, activo=True).order_by(Lower('nombre'))
+        contexto[f'productos_{clave}'] = productos
+        contexto['sectores'].append({
+            'clave': clave,
+            'etiqueta': etiqueta,
+            'productos': productos,
+            'sin_precio': not sector_valoriza(clave),
+        })
+    return contexto
 
 
 def compras(request):
@@ -927,3 +1176,147 @@ def consumo_evento(request, evento_pk):
     context['empleados'] = Empleado.objects.select_related('puesto_habitual').order_by('nombre')
     context['puestos'] = Puesto.objects.all()
     return render(request, 'stock/consumo_evento.html', context)
+
+
+# ---------- Usuarios del sistema (solo el administrador) ----------
+class UsuarioCreationForm(UserCreationForm):
+    """El alta de Django, más el rol.
+
+    Es la excepción a "no hay forms.py": las dos contraseñas repetidas y los
+    validadores ya están resueltos acá adentro, y rehacerlos a mano para no
+    escribir cuatro líneas sería el peor negocio del proyecto.
+    """
+
+    class Meta(UserCreationForm.Meta):
+        fields = ['username', 'is_staff']
+
+
+def preparar_rol(form):
+    """`is_staff` ES el rol. Tildado, administrador; sin tildar, empleado.
+
+    Mismo criterio que preparar_precio(): el campo ya existe y lo único que le
+    falta es decir en castellano qué significa.
+    """
+    campo = form.fields['is_staff']
+    campo.label = 'Administrador'
+    campo.help_text = (
+        'Ve todo el sistema y puede dar de alta usuarios. Sin tildar, la persona '
+        'entra como empleado.'
+    )
+
+
+class UsuarioListView(SoloAdminMixin, ListView):
+    model = User
+    template_name = 'stock/usuario_list.html'
+    context_object_name = 'usuarios'
+    ordering = ['username']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(username__icontains=q)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['q'] = self.request.GET.get('q', '')
+        return context
+
+
+class UsuarioCreateView(SoloAdminMixin, CreateView):
+    model = User
+    form_class = UsuarioCreationForm
+    template_name = 'stock/usuario_form.html'
+    success_url = reverse_lazy('stock:usuario_list')
+    extra_context = {
+        'titulo': 'Nuevo usuario',
+        'subtitulo': 'Con estos datos la persona va a poder ingresar al sistema.',
+    }
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        preparar_rol(form)
+        return form
+
+    def form_valid(self, form):
+        respuesta = super().form_valid(form)
+        messages.success(self.request, f'Creamos a "{self.object.username}". Ya puede ingresar.')
+        return respuesta
+
+
+class UsuarioUpdateView(SoloAdminMixin, UpdateView):
+    model = User
+    # La contraseña no se toca acá: tiene pantalla propia, con la repetición y
+    # los validadores. Mezclarla con el resto obligaría a reescribirla cada vez
+    # que se corrige un nombre.
+    fields = ['username', 'is_staff', 'is_active']
+    template_name = 'stock/usuario_form.html'
+    success_url = reverse_lazy('stock:usuario_list')
+    extra_context = {
+        'titulo': 'Editar usuario',
+        'subtitulo': 'El nombre con el que ingresa, su rol, y si sigue teniendo acceso.',
+    }
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        preparar_rol(form)
+        form.fields['is_active'].label = 'Puede ingresar'
+        form.fields['is_active'].help_text = (
+            'Destildalo para dejar a alguien afuera sin borrarle el usuario.'
+        )
+        if self.object == self.request.user:
+            # Nadie se saca a sí mismo el acceso: quedaría afuera del módulo con
+            # la sesión abierta y sin forma de volver a entrar. `disabled` además
+            # ignora lo que venga por POST, así que tampoco se hace a mano.
+            form.fields['is_staff'].disabled = True
+            form.fields['is_active'].disabled = True
+        return form
+
+    def form_valid(self, form):
+        # Bajar a empleado tiene que bajar de verdad: a un superusuario le queda
+        # is_superuser y con eso pasa cualquier chequeo de permisos de Django.
+        if not form.instance.is_staff:
+            form.instance.is_superuser = False
+        return super().form_valid(form)
+
+
+class UsuarioPasswordView(SoloAdminMixin, UpdateView):
+    """Cambiarle la contraseña a otro: el olvido es el soporte real de esto."""
+
+    model = User
+    form_class = SetPasswordForm
+    template_name = 'stock/usuario_form.html'
+    success_url = reverse_lazy('stock:usuario_list')
+    extra_context = {
+        'titulo': 'Cambiar contraseña',
+        'subtitulo': 'La anterior deja de servir apenas guardes.',
+    }
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # SetPasswordForm no es un ModelForm: recibe al usuario como `user` y no
+        # sabe qué hacer con un `instance`.
+        kwargs.pop('instance', None)
+        kwargs['user'] = self.object
+        return kwargs
+
+    def form_valid(self, form):
+        respuesta = super().form_valid(form)
+        messages.success(self.request, f'Le cambiamos la contraseña a "{self.object.username}".')
+        return respuesta
+
+
+class UsuarioDeleteView(SoloAdminMixin, DeleteView):
+    model = User
+    template_name = 'stock/usuario_confirm_delete.html'
+    success_url = reverse_lazy('stock:usuario_list')
+
+    def get_queryset(self):
+        # Borrarse a sí mismo es cerrar la puerta con la llave adentro. Va en el
+        # queryset y no en el template: el botón se esconde, la URL no.
+        return super().get_queryset().exclude(pk=self.request.user.pk)
+
+    def form_valid(self, form):
+        messages.success(self.request, f'Borramos el usuario "{self.object.username}".')
+        return super().form_valid(form)

@@ -1,0 +1,29 @@
+{% comment %}
+Botonera de sectores, compartida por Productos, Compras, Consumo y Merma (RN-8).
+
+Se itera sobre `sectores` en vez de escribir una pestaña por sector a mano: son
+cuatro pantallas, y a mano cada sector nuevo son ocho bloques que se olvidan de a uno.
+
+⚠️ Los `id` (barra-pane, cocina-pane, …) son CONTRATO con las vistas: `compras` y
+`merma` redirigen a `#<sector>-pane` después de guardar. Se generan desde la clave
+del sector justamente para que no se puedan desincronizar.
+{% endcomment %}
+<div data-tabs data-tab-default="#barra-pane" role="tablist" aria-label="Sectores"
+     class="flex border-b border-outline-variant gap-stack-md sm:gap-gutter overflow-x-auto">
+  {% for sector in sectores %}
+  <button type="button" id="{{ sector.clave }}-tab" role="tab" aria-controls="{{ sector.clave }}-pane"
+          aria-selected="false" data-tab-target="#{{ sector.clave }}-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">{{ sector.etiqueta }}</button>
+  {% endfor %}
+
+  {% comment %}
+  Una pestaña de cierre que no es un sector: Consumo la usa para "Personal".
+  Va como parámetro del include y no como {% templatetag openblock %} block {% templatetag closeblock %}, porque los bloques NO
+  atraviesan un include — quedaría siempre vacío y nadie se daría cuenta.
+  {% endcomment %}
+  {% if tab_extra_id %}
+  <button type="button" id="{{ tab_extra_id }}-tab" role="tab" aria-controls="{{ tab_extra_id }}-pane"
+          aria-selected="false" data-tab-target="#{{ tab_extra_id }}-pane"
+          class="pb-2 px-4 font-body-md text-body-md border-b-2 border-transparent text-secondary hover:text-primary transition-colors whitespace-nowrap">{{ tab_extra_label }}</button>
+  {% endif %}
+</div>

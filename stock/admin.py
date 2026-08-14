@@ -7,6 +7,7 @@ from django.forms.models import BaseInlineFormSet
 
 from .models import (
     CargoEvento,
+    DestinatarioAviso,
     Empleado,
     Evento,
     LineaReceta,
@@ -17,6 +18,7 @@ from .models import (
     Plato,
     Producto,
     Puesto,
+    TarjetaEvento,
 )
 
 
@@ -82,6 +84,13 @@ class PlatoAdmin(admin.ModelAdmin):
         return obj.costo_por_persona
 
 
+@admin.register(DestinatarioAviso)
+class DestinatarioAvisoAdmin(admin.ModelAdmin):
+    list_display = ('email', 'nombre', 'activo')
+    list_filter = ('activo',)
+    search_fields = ('email', 'nombre')
+
+
 @admin.register(Puesto)
 class PuestoAdmin(admin.ModelAdmin):
     list_display = ('nombre',)
@@ -95,6 +104,12 @@ class EmpleadoAdmin(admin.ModelAdmin):
     list_select_related = ('puesto_habitual',)
     search_fields = ('nombre',)
     ordering = ('nombre',)
+
+
+class TarjetaEventoInline(admin.TabularInline):
+    model = TarjetaEvento
+    extra = 1
+    fields = ('concepto', 'cantidad', 'valor_unitario', 'menu')
 
 
 class CargoEventoInline(admin.TabularInline):
@@ -190,6 +205,7 @@ class EventoAdmin(admin.ModelAdmin):
         'fecha',
         'estado',
         'asistentes',
+        'ingreso_total',
         'gasto_stock',
         'gasto_personal',
         'gasto_total',
@@ -198,10 +214,14 @@ class EventoAdmin(admin.ModelAdmin):
     search_fields = ('nombre',)
     date_hierarchy = 'fecha'
     ordering = ('-fecha',)
-    inlines = [CargoEventoInline, PersonalEventoInline, MovimientoStockInline]
+    inlines = [TarjetaEventoInline, CargoEventoInline, PersonalEventoInline, MovimientoStockInline]
 
     # Los tres gastos son properties del modelo (RN-6). Se envuelven acá solo
     # para que la columna tenga un título en castellano.
+    @admin.display(description='Facturado')
+    def ingreso_total(self, obj):
+        return obj.ingreso_total
+
     @admin.display(description='Gasto de stock')
     def gasto_stock(self, obj):
         return obj.gasto_stock
